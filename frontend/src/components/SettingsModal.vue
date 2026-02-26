@@ -108,6 +108,37 @@
             </div>
           </div>
 
+          <!-- WebDAV -->
+          <div class="sm-card">
+            <h4 class="sm-card-title">WebDAV</h4>
+            <div class="sm-fields">
+              <div class="sm-field">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                  <span>{{ lang === 'zh' ? '启用 WebDAV' : 'Enable WebDAV' }}</span>
+                  <div class="toggle-wrap" @click="webdavForm.enabled = !webdavForm.enabled">
+                    <div class="toggle" :class="{ on: webdavForm.enabled }">
+                      <div class="toggle-knob"></div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+              <div class="sm-field">
+                <label>{{ lang === 'zh' ? '存储子目录（相对于存储根目录）' : 'Storage subdirectory (relative to root)' }}</label>
+                <input v-model="webdavForm.subPath" type="text" placeholder="webdav" />
+              </div>
+              <div class="sm-field">
+                <label>{{ lang === 'zh' ? 'WebDAV 独立密码（留空则使用账户密码）' : 'WebDAV password (blank = use account password)' }}</label>
+                <input v-model="webdavForm.password" type="password" :placeholder="lang === 'zh' ? '留空则使用账户密码' : 'Leave blank to use account password'" />
+              </div>
+            </div>
+            <div class="sm-actions">
+              <button class="sm-btn" @click="saveWebDAV">
+                <svg v-if="savedWebDAV" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>{{ savedWebDAV ? (lang === 'zh' ? '已保存' : 'Saved!') : (lang === 'zh' ? '保存' : 'Save') }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- 语言 -->
           <div class="sm-card">
             <h4 class="sm-card-title">{{ lang === 'zh' ? '语言 / Language' : 'Language / 语言' }}</h4>
@@ -187,6 +218,29 @@ function switchLang(l) {
   setLang(l)
 }
 
+// WebDAV
+const webdavForm = ref({ enabled: false, subPath: '', password: '' })
+const savedWebDAV = ref(false)
+
+async function loadWebDAV() {
+  try {
+    const { data } = await api.get('/webdav/settings')
+    webdavForm.value.enabled = data.webdav_enabled
+    webdavForm.value.subPath = data.webdav_sub_path || ''
+    webdavForm.value.password = ''
+  } catch {}
+}
+
+async function saveWebDAV() {
+  await api.put('/webdav/settings', {
+    webdav_enabled: webdavForm.value.enabled,
+    webdav_sub_path: webdavForm.value.subPath,
+    webdav_password: webdavForm.value.password,
+  })
+  savedWebDAV.value = true
+  setTimeout(() => savedWebDAV.value = false, 2000)
+}
+
 async function loadData() {
   if (auth.user) {
     userForm.value.username = auth.user.username
@@ -196,6 +250,7 @@ async function loadData() {
     storageForm.value.dir = data.storage_dir
     originalStorageDir.value = data.storage_dir
   } catch {}
+  await loadWebDAV()
 }
 
 async function saveUser() {
@@ -367,6 +422,22 @@ watch(() => props.modelValue, (v) => {
 }
 .lang-btns button.active { background: var(--primary-gradient); color: white; border-color: transparent; }
 .lang-btns button:hover:not(.active) { border-color: var(--blue-400); color: var(--blue-600); }
+
+/* Toggle switch */
+.toggle-wrap { display: inline-flex; cursor: pointer; }
+.toggle {
+  width: 40px; height: 22px; border-radius: 11px;
+  background: var(--gray-200); transition: background 0.2s;
+  position: relative; flex-shrink: 0;
+}
+.toggle.on { background: var(--blue-500); }
+.toggle-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+.toggle.on .toggle-knob { transform: translateX(18px); }
 
 @media (max-width: 600px) {
   .modal-bg { align-items: flex-end; }
