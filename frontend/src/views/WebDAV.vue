@@ -60,8 +60,6 @@
         <button class="btn-go-settings" @click="showSettings = true">{{ t.settings }}</button>
       </div>
 
-      <SettingsModal v-model="showSettings" @update:modelValue="onSettingsClose" />
-
       <!-- ===== 已启用内容 ===== -->
       <div v-else class="webdav-content">
 
@@ -158,6 +156,8 @@
         </div>
       </div>
     </div>
+
+    <SettingsModal v-model="showSettings" @update:modelValue="onSettingsClose" />
   </Layout>
 </template>
 
