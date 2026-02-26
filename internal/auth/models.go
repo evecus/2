@@ -17,9 +17,12 @@ type User struct {
 }
 
 type Settings struct {
-	ID         uint   `gorm:"primarykey"`
-	StorageDir string `json:"storage_dir"`
-	Lang       string `json:"lang"`
+	ID             uint   `gorm:"primarykey"`
+	StorageDir     string `json:"storage_dir"`
+	Lang           string `json:"lang"`
+	WebDAVEnabled  bool   `json:"webdav_enabled"`
+	WebDAVSubPath  string `json:"webdav_sub_path"`
+	WebDAVPassword string `json:"webdav_password"`
 }
 
 type ShareLink struct {
