@@ -318,6 +318,11 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
             <span>{{ t.permissions }}</span>
           </div>
+          <div class="ctx-item" @click="ctxAction('info')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>{{ lang==='zh' ? '信息' : 'Info' }}</span>
+          </div>
+          <div class="ctx-divider"></div>
           <div class="ctx-item ctx-item-danger" @click="ctxAction('delete')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
             <span>{{ t.delete }}</span>
@@ -483,6 +488,85 @@
           <div class="modal-actions">
             <button class="btn-ghost" @click="deleteTarget=null">{{ t.cancel }}</button>
             <button class="btn-danger" @click="doDelete">{{ t.confirm }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 文件信息弹窗 -->
+      <div v-if="infoTarget" class="modal-bg" @click.self="infoTarget=null">
+        <div class="modal info-modal">
+          <div class="info-modal-header">
+            <div class="info-modal-icon" :class="infoTarget.is_dir ? 'folder-icon' : getExt(infoTarget.name)">
+              <svg v-if="infoTarget.is_dir" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z"/></svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <div class="info-modal-title">
+              <span class="info-filename">{{ infoTarget.name }}</span>
+              <span class="info-type-badge" :class="infoTarget.is_dir ? 'badge-dir' : 'badge-file'">
+                {{ infoTarget.is_dir ? (lang==='zh'?'文件夹':'Folder') : (lang==='zh'?'文件':'File') }}
+              </span>
+            </div>
+            <button class="info-close-btn" @click="infoTarget=null">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="info-list">
+            <div class="info-row">
+              <span class="info-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                {{ lang==='zh'?'文件名':'Name' }}
+              </span>
+              <span class="info-value info-mono">{{ infoTarget.name }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                {{ lang==='zh'?'路径':'Path' }}
+              </span>
+              <span class="info-value info-mono info-path">{{ infoTarget.path }}</span>
+            </div>
+            <div class="info-row" v-if="!infoTarget.is_dir">
+              <span class="info-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                {{ lang==='zh'?'大小':'Size' }}
+              </span>
+              <span class="info-value">{{ formatSize(infoTarget.size) }} <span class="info-bytes">({{ infoTarget.size?.toLocaleString() }} bytes)</span></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                {{ lang==='zh'?'修改时间':'Modified' }}
+              </span>
+              <span class="info-value">{{ formatDate(infoTarget.mod_time) }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                {{ lang==='zh'?'权限':'Permissions' }}
+              </span>
+              <span class="info-value">
+                <code class="info-perm-code">{{ formatMode(infoTarget.mode) }}</code>
+                <span class="info-perm-text">{{ formatModeStr(infoTarget.mode) }}</span>
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                {{ lang==='zh'?'可见性':'Visibility' }}
+              </span>
+              <span class="info-value">
+                <span class="info-vis-badge" :class="infoTarget.is_public ? 'vis-public' : 'vis-private'">
+                  {{ infoTarget.is_public ? (lang==='zh'?'公开':'Public') : (lang==='zh'?'私有':'Private') }}
+                </span>
+              </span>
+            </div>
+            <div class="info-row" v-if="!infoTarget.is_dir">
+              <span class="info-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                {{ lang==='zh'?'扩展名':'Extension' }}
+              </span>
+              <span class="info-value info-mono">{{ infoTarget.name.includes('.') ? '.'+infoTarget.name.split('.').pop().toLowerCase() : (lang==='zh'?'无':'None') }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -809,6 +893,7 @@ const folderUploadDone = ref(false)
 const newDirName = ref('')
 const newFile = ref({ name:'', content:'' })
 const deleteTarget = ref(null)
+const infoTarget = ref(null)
 const shareResult = ref(null)
 const shareTarget = ref(null)
 const showShareModal = ref(false)
@@ -929,7 +1014,7 @@ function exitSelectAndClose(which) {
 function openCtxMenu(e, file) {
   closeCtxMenu()
   // 计算菜单位置，防止溢出屏幕
-  const menuW = 200, menuH = 360
+  const menuW = 200, menuH = 420
   let x = e.clientX, y = e.clientY
   if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
   if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8
@@ -945,7 +1030,7 @@ function onTouchStart(e, file) {
   longPressTimer = setTimeout(() => {
     if (!touchMoved) {
       const touch = e.touches[0]
-      const menuW = 200, menuH = 360
+      const menuW = 200, menuH = 420
       let x = touch.clientX, y = touch.clientY
       if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
       if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8
@@ -974,6 +1059,7 @@ async function ctxAction(action) {
     case 'share': await shareFile(file); break
     case 'togglePublic': togglePublic(file); break
     case 'chmod': await openChmod(file); break
+    case 'info': infoTarget.value = file; break
     case 'delete': confirmDelete(file); break
     case 'move':
       singleOpFile.value = file
@@ -1121,6 +1207,12 @@ function formatMode(mode) {
   if (!mode) return '---'
   const m = mode & 0o777
   return `${(m>>6)&7}${(m>>3)&7}${m&7}`
+}
+function formatModeStr(mode) {
+  if (!mode) return ''
+  const m = mode & 0o777
+  const bits = (n) => [(n&4)?'r':'-',(n&2)?'w':'-',(n&1)?'x':'-'].join('')
+  return bits((m>>6)&7)+bits((m>>3)&7)+bits(m&7)
 }
 function getExt(name) {
   const ext = name.split('.').pop()?.toLowerCase()
@@ -1407,8 +1499,71 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .col-perm { font-size:12px; }
 .perm-badge { font-family:'JetBrains Mono',monospace; font-size:12px; padding:2px 8px; background:var(--gray-100); color:var(--gray-500); border-radius:6px; }
 
-/* 右键菜单 */
-.ctx-overlay { position:fixed; inset:0; z-index:300; }
+/* 文件信息弹窗 */
+.info-modal { padding: 0 !important; overflow: hidden; }
+.info-modal-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--gray-100);
+  background: linear-gradient(135deg, #F8FAFF 0%, #EEF4FF 100%);
+  border-radius: 20px 20px 0 0;
+  position: relative;
+}
+.info-modal-icon {
+  width: 44px; height: 44px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.info-modal-icon svg { width: 22px; height: 22px; }
+.info-modal-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.info-filename { font-size: 15px; font-weight: 700; color: var(--gray-800); word-break: break-all; line-height: 1.3; }
+.info-type-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; width: fit-content; }
+.badge-dir { background: rgba(245,158,11,.12); color: #D97706; }
+.badge-file { background: rgba(59,130,246,.12); color: var(--blue-600); }
+.info-close-btn {
+  position: absolute; top: 14px; right: 14px;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: none; background: rgba(239,68,68,.1);
+  color: #EF4444; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.info-close-btn:hover { background: rgba(239,68,68,.2); }
+.info-close-btn svg { width: 13px; height: 13px; }
+.info-list { padding: 8px 0 4px; }
+.info-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 24px;
+  border-bottom: 1px solid var(--gray-50);
+  transition: background .1s;
+}
+.info-row:last-child { border-bottom: none; }
+.info-row:hover { background: var(--gray-50); }
+.info-label {
+  display: flex; align-items: center; gap: 7px;
+  min-width: 90px; font-size: 12px; font-weight: 600;
+  color: var(--gray-400); padding-top: 2px; flex-shrink: 0;
+}
+.info-label svg { width: 13px; height: 13px; flex-shrink: 0; }
+.info-value {
+  font-size: 13px; color: var(--gray-700); font-weight: 500;
+  word-break: break-all; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.info-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.info-path { color: var(--blue-600); }
+.info-bytes { font-size: 11px; color: var(--gray-400); font-weight: 400; }
+.info-perm-code {
+  font-family: 'JetBrains Mono', monospace; font-size: 14px;
+  font-weight: 700; color: var(--gray-700);
+  background: var(--gray-100); padding: 2px 10px; border-radius: 6px;
+}
+.info-perm-text { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gray-500); }
+.info-vis-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+.vis-public { background: rgba(16,185,129,.12); color: #059669; }
+.vis-private { background: var(--gray-100); color: var(--gray-500); }
+
+
 .ctx-menu { position:fixed; background:white; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.18),0 0 0 1px rgba(0,0,0,0.06); padding:5px; min-width:190px; z-index:301; animation:ctxIn .12s cubic-bezier(.4,0,.2,1); }
 @keyframes ctxIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
 .ctx-item { display:flex; align-items:center; gap:9px; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--gray-700); transition:background .1s; user-select:none; }
@@ -1734,6 +1889,45 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   .dir-tree { max-height:200px; }
   .ctx-menu { min-width:180px; }
   .ctx-item { padding:12px 16px; font-size:14px; }
+
+  /* 移动端右键菜单改为底部弹出 sheet */
+  .ctx-overlay {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(15,23,42,0.4);
+    backdrop-filter: blur(3px);
+  }
+  .ctx-menu {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    padding: 8px 0 24px !important;
+    animation: ctxSlideUp .2s cubic-bezier(.4,0,.2,1) !important;
+    box-shadow: 0 -4px 32px rgba(15,23,42,.18) !important;
+  }
+  @keyframes ctxSlideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .ctx-menu::before {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    background: #CBD5E1;
+    border-radius: 2px;
+    margin: 0 auto 10px;
+  }
+  .ctx-item { padding: 14px 20px; font-size: 15px; }
+  .info-modal-header { padding: 18px 16px 14px; }
+  .info-row { padding: 11px 16px; }
+  .info-label { min-width: 78px; }
+  .ctx-item svg { width: 18px; height: 18px; }
+  .ctx-divider { margin: 6px 0; }
 
   /* 搜索目录输入框移动端适配 */
   .search-dir-input { font-size:16px; } /* 防止 iOS 自动缩放 */
