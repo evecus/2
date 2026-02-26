@@ -376,7 +376,7 @@ func (m *Manager) Open(rel string) (*os.File, error) {
 	return os.Open(abs)
 }
 
-// ListPublic 返回目录下有 is_public=true 标记的条目（精确，无继承）。
+// ListPublic 返回目录下有 is_public=true 标记的直接子条目（用于已登录管理界面浏览某目录时）。
 func (m *Manager) ListPublic(rel string) ([]FileInfo, error) {
 	all, err := m.ListDir(rel)
 	if err != nil {
@@ -387,6 +387,69 @@ func (m *Manager) ListPublic(rel string) ([]FileInfo, error) {
 		if f.IsPublic {
 			result = append(result, f)
 		}
+	}
+	return result, nil
+}
+
+// GetAllPublicFlat 返回所有公开条目的平铺列表，规则：
+//
+//   - 从 DB 取出全部 is_public=true 的路径
+//   - 若某路径的直接父路径也有 is_public=true 记录，则跳过该路径
+//     （它会在父文件夹被浏览时展示，不需要在顶层重复出现）
+//   - 若某路径的直接父路径没有 is_public=true 记录，则直接列在顶层
+//
+// 效果：无论文件/文件夹在多深层级都直接浮现到顶层，不显示任何父文件夹。
+// 被整体设为公开的文件夹，其内部子项不会重复出现在顶层。
+func (m *Manager) GetAllPublicFlat() ([]FileInfo, error) {
+	// 1. 取出所有 is_public=true 的路径
+	var records []auth.FileVisibility
+	if err := m.db.Where("is_public = ?", true).Find(&records).Error; err != nil {
+		return nil, err
+	}
+
+	// 2. 建立快速查找集合
+	publicSet := make(map[string]struct{}, len(records))
+	for _, r := range records {
+		publicSet[r.FilePath] = struct{}{}
+	}
+
+	// 3. 过滤：只保留「父路径没有 is_public=true 记录」的条目
+	result := make([]FileInfo, 0)
+	for _, r := range records {
+		parentPath := filepath.Dir(r.FilePath)
+		if parentPath == "." {
+			parentPath = "/"
+		}
+		// 父路径也是公开的，跳过（避免重复，由父文件夹包含）
+		if _, parentPublic := publicSet[parentPath]; parentPublic {
+			continue
+		}
+
+		// 4. 从文件系统获取该条目的实际信息
+		abs, err := m.AbsPath(r.FilePath)
+		if err != nil {
+			continue
+		}
+		info, err := os.Stat(abs)
+		if err != nil {
+			// 文件已不存在，清理这条脏记录
+			m.db.Delete(&r)
+			continue
+		}
+
+		fi := FileInfo{
+			Name:     filepath.Base(r.FilePath),
+			Path:     r.FilePath,
+			IsDir:    info.IsDir(),
+			IsPublic: true,
+			Size:     info.Size(),
+			ModTime:  info.ModTime(),
+			Mode:     info.Mode(),
+		}
+		if info.IsDir() {
+			fi.Size = 0
+		}
+		result = append(result, fi)
 	}
 	return result, nil
 }
