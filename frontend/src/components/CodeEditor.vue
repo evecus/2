@@ -113,6 +113,7 @@ const lightTheme = EditorView.theme({
   '&': {
     fontSize: '13px',
     fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+    fontWeight: '600',
     background: '#FFFFFF',
     color: '#1E293B',
     height: '100%',
@@ -284,9 +285,11 @@ watch(() => props.filename, (name) => {
   }
   .cm-editor-container :deep(.cm-editor) {
     font-size: 14px !important;
+    font-weight: 400 !important;
   }
   .cm-editor-container :deep(.cm-content) {
     font-size: 14px;
+    font-weight: 400;
   }
   /* 移动端行号缩窄 */
   .cm-editor-container :deep(.cm-lineNumbers .cm-gutterElement) {
