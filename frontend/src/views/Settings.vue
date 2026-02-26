@@ -67,6 +67,46 @@
           </button>
         </div>
 
+        <!-- WebDAV -->
+        <div class="settings-card">
+          <h4 class="card-title">{{ t.webdavSettings }}</h4>
+
+          <!-- 开关 -->
+          <div class="webdav-toggle-row">
+            <div class="webdav-toggle-info">
+              <span class="toggle-label">{{ t.webdavEnabled }}</span>
+              <span class="toggle-desc">{{ t.webdavEnabledDesc }}</span>
+            </div>
+            <button class="toggle-btn" :class="{ on: webdavForm.enabled }" @click="webdavForm.enabled = !webdavForm.enabled">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+
+          <!-- 详细配置（启用时显示） -->
+          <div v-if="webdavForm.enabled" class="webdav-fields">
+            <div class="field">
+              <label>{{ t.webdavSubPath }}</label>
+              <p class="field-desc">{{ t.webdavSubPathDesc }}</p>
+              <input v-model="webdavForm.subPath" type="text" :placeholder="t.webdavSubPathPlaceholder" />
+            </div>
+            <div class="field">
+              <label>{{ t.webdavPassword }}</label>
+              <p class="field-desc">{{ t.webdavPasswordDesc }}</p>
+              <input v-model="webdavForm.password" type="password" :placeholder="t.webdavPasswordPlaceholder" autocomplete="new-password" />
+            </div>
+            <!-- 连接地址预览 -->
+            <div class="webdav-addr-preview">
+              <span class="addr-label">{{ t.webdavAddress }}</span>
+              <code class="addr-value">{{ davUrl }}</code>
+            </div>
+          </div>
+
+          <button class="btn-save" @click="saveWebDAV">
+            <span v-if="!savedWebDAV">{{ t.save }}</span>
+            <span v-else>✓ {{ t.saved }}</span>
+          </button>
+        </div>
+
         <!-- Theme -->
         <div class="settings-card">
           <h4 class="card-title">{{ lang === 'zh' ? '界面主题' : 'Theme' }}</h4>
@@ -92,7 +132,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Layout from '../components/Layout.vue'
 import api from '../api'
 import { t, currentLang as lang, setLang } from '../i18n'
@@ -103,7 +143,11 @@ const userForm = ref({ username: '', email: '', password: '' })
 const settingsForm = ref({ storageDir: '' })
 const savedUser = ref(false)
 const savedSettings = ref(false)
+const savedWebDAV = ref(false)
 const currentTheme = ref(localStorage.getItem('theme') || 'blue')
+
+const webdavForm = ref({ enabled: false, subPath: '', password: '' })
+const davUrl = computed(() => `${window.location.origin}/dav/`)
 
 const themes = [
   { id: 'blue',   label: lang.value === 'zh' ? '蓝白（默认）' : 'Blue (Default)', gradient: 'linear-gradient(135deg, #2563EB, #0EA5E9)' },
@@ -132,6 +176,23 @@ async function load() {
   }
   const { data } = await api.get('/settings')
   settingsForm.value.storageDir = data.storage_dir
+
+  const { data: wdata } = await api.get('/webdav/settings')
+  webdavForm.value = {
+    enabled: wdata.webdav_enabled,
+    subPath: wdata.webdav_sub_path,
+    password: wdata.webdav_password,
+  }
+}
+
+async function saveWebDAV() {
+  await api.put('/webdav/settings', {
+    webdav_enabled: webdavForm.value.enabled,
+    webdav_sub_path: webdavForm.value.subPath,
+    webdav_password: webdavForm.value.password,
+  })
+  savedWebDAV.value = true
+  setTimeout(() => savedWebDAV.value = false, 2000)
 }
 
 async function saveUser() {
@@ -268,5 +329,47 @@ onMounted(load)
   font-size: 12px;
   font-weight: 700;
   color: var(--blue-600);
+}
+
+/* WebDAV 开关行 */
+.webdav-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.webdav-toggle-info { flex: 1; min-width: 0; }
+.toggle-label { font-size: 14px; font-weight: 600; color: var(--gray-700); display: block; }
+.toggle-desc  { font-size: 12px; color: var(--gray-400); margin-top: 3px; display: block; }
+
+.toggle-btn {
+  width: 44px; height: 24px; border-radius: 12px;
+  background: var(--gray-200); border: none; cursor: pointer;
+  position: relative; transition: background 0.2s; flex-shrink: 0;
+}
+.toggle-btn.on { background: var(--blue-500); }
+.toggle-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: white; transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.toggle-btn.on .toggle-knob { transform: translateX(20px); }
+
+.webdav-fields { display: flex; flex-direction: column; gap: 16px; margin-bottom: 4px; }
+.field-desc { font-size: 12px; color: var(--gray-400); margin: -4px 0 8px; }
+
+.webdav-addr-preview {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; background: var(--blue-50);
+  border: 1px solid var(--blue-100); border-radius: var(--radius-sm);
+}
+.addr-label { font-size: 12px; font-weight: 600; color: var(--gray-500); flex-shrink: 0; }
+.addr-value { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--blue-700); word-break: break-all; }
+
+@media (max-width: 768px) {
+  .page-header { padding: 14px 16px; }
+  .content { padding: 16px; }
+  .settings-card { padding: 16px; }
+  .theme-grid { grid-template-columns: repeat(2, 1fr); }
+  .webdav-addr-preview { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
 </style>
