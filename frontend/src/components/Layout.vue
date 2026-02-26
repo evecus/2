@@ -34,6 +34,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
           {{ t.public }}
         </router-link>
+        <router-link v-if="webdavEnabled" to="/webdav" class="nav-item" :class="{ active: $route.path === '/webdav' }">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12H3l9-9 9 9h-2"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg>
+          {{ t.webdav }}
+        </router-link>
       </nav>
 
       <div class="sidebar-bottom">
@@ -49,12 +53,24 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { t } from '../i18n'
+import api from '../api'
 
 const router = useRouter()
 const auth = useAuthStore()
+const webdavEnabled = ref(false)
+
+async function loadWebDAVStatus() {
+  try {
+    const { data } = await api.get('/webdav/settings')
+    webdavEnabled.value = data.webdav_enabled
+  } catch {}
+}
+
+onMounted(loadWebDAVStatus)
 
 function doLogout() { auth.logout(); router.push('/login') }
 </script>
