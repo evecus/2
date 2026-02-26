@@ -229,6 +229,8 @@ watch(() => props.filename, (name) => {
   transition: border-color .2s, box-shadow .2s;
   min-height: 0;
   position: relative;
+  /* 给 CodeMirror 一个明确的高度锚点 */
+  height: 100%;
 }
 .cm-editor-wrap.cm-focused {
   border-color: var(--blue-500);
@@ -258,15 +260,21 @@ watch(() => props.filename, (name) => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
-/* CodeMirror 的根元素需要填满容器 */
+/* CodeMirror 的根元素需要填满容器并允许滚动 */
 .cm-editor-container :deep(.cm-editor) {
   height: 100%;
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .cm-editor-container :deep(.cm-scroller) {
-  overflow: auto;
+  overflow: auto !important;
+  /* 移动端触摸滚动 */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 移动端适配 */
