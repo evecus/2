@@ -1037,8 +1037,8 @@ function onTouchStart(e, file) {
       const extraH = isArchive(file.name) ? 36 : 0
       const menuH = baseH + extraH
       const x = window.innerWidth - menuW - 8
-      // 固定 y=224，对应长按第二个文件时弹窗顶部位置
-      const y = 180
+      // 固定 y=170，对应长按第二个文件时弹窗顶部位置
+      const y = 170
       ctxMenu.value = { show:true, x, y, file }
     }
   }, 500)
