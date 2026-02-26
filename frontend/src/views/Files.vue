@@ -419,7 +419,7 @@
 
       <!-- 编辑/预览文件 -->
       <div v-if="showEdit" class="modal-bg" @click.self="showEdit=false">
-        <div class="modal modal-xl">
+        <div class="modal" :class="fileViewMode==='unsupported' ? 'modal-unsupported' : 'modal-xl'">
           <div class="modal-titlebar">
             <h3>
               <span v-if="fileViewMode==='image'">{{ lang==='zh'?'预览图片':'Preview' }}</span>
@@ -844,7 +844,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import SettingsModal from '../components/SettingsModal.vue'
@@ -1285,13 +1285,21 @@ async function editFile(file) {
   catch(e) { editError.value=e.response?.data?.error||t.value.binaryFile }
 }
 // 强制以文本模式打开（用于 unsupported 文件尝试编辑）
+// 关闭当前 unsupported 弹窗，重新以 text 模式打开编辑弹窗
 async function forceEditFile() {
   if (!editTarget.value) return
-  fileViewMode.value = 'text'
+  const file = editTarget.value
+  showEdit.value = false
+  await nextTick()
+  // 强制覆盖扩展名检测，直接用 text 模式
+  editTarget.value = file
   editContent.value = ''
   editError.value = ''
+  previewUrl.value = ''
+  fileViewMode.value = 'text'
+  showEdit.value = true
   try {
-    const { data } = await api.get('/files/content', { params: { path: editTarget.value.path } })
+    const { data } = await api.get('/files/content', { params: { path: file.path } })
     editContent.value = data.content
   } catch(e) {
     editError.value = e.response?.data?.error || (lang.value === 'zh' ? '无法读取文件内容' : 'Cannot read file content')
@@ -1607,9 +1615,10 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .modal { background:white; border-radius:20px; padding:32px; width:440px; max-width:90vw; box-shadow:var(--shadow-lg); animation:modalIn .2s cubic-bezier(.4,0,.2,1); overflow:hidden; }
 .modal-lg { width:520px; }
 .modal-xl { width:760px; max-height:90vh; display:flex; flex-direction:column; padding:0; background:#F8FAFC; }
-.modal-xl .modal-titlebar { padding:20px 24px 18px; border-bottom:2px solid var(--gray-200); margin-bottom:0; background:#F1F5F9; border-radius:20px 20px 0 0; }
+.modal-unsupported { width:440px; max-width:90vw; max-height:90vh; display:flex; flex-direction:column; padding:0; background:#F8FAFC; }
+.modal-xl .modal-titlebar, .modal-unsupported .modal-titlebar { padding:20px 24px 18px; border-bottom:2px solid var(--gray-200); margin-bottom:0; background:#F1F5F9; border-radius:20px 20px 0 0; }
 .modal-xl .field { padding:0; margin:0; background:#F8FAFC; flex:1; display:flex; flex-direction:column; }
-.modal-xl .modal-actions { padding:14px 24px; border-top:2px solid var(--gray-200); background:#F1F5F9; margin-top:0; border-radius:0 0 20px 20px; }
+.modal-xl .modal-actions, .modal-unsupported .modal-actions { padding:14px 24px; border-top:2px solid var(--gray-200); background:#F1F5F9; margin-top:0; border-radius:0 0 20px 20px; }
 .modal-move { width:500px; display:flex; flex-direction:column; }
 @keyframes modalIn { from{opacity:0;transform:scale(.95) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
 .modal-titlebar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
@@ -1647,7 +1656,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .preview-img { max-width:100%; max-height:60vh; object-fit:contain; border-radius:8px; box-shadow:var(--shadow-sm); }
 .unsupported-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 20px; gap:14px; flex:1; }
 /* unsupported 底栏两按钮左对齐排列 */
-.modal-actions-unsupported { justify-content:flex-start; gap:8px; }
+.modal-actions-unsupported { justify-content:center; gap:12px; }
 /* 移动端底栏按钮加大点击区域 */
 .btn-action-mob { display:flex; align-items:center; gap:6px; }
 .unsupported-wrap svg { width:56px; height:56px; color:var(--gray-300); }
@@ -1909,13 +1918,14 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
     padding:24px 20px 32px !important;
     max-height:90vh; overflow-y:auto;
   }
-  .modal-xl {
+  .modal-xl, .modal-unsupported {
     width:100% !important; max-width:100% !important;
     max-height:92vh !important;
     border-radius:20px 20px 0 0 !important;
   }
   /* 编辑器弹窗移动端适配 */
   .modal-xl { max-height:100vh !important; border-radius:0 !important; }
+  .modal-unsupported { max-height:80vh !important; border-radius:20px 20px 0 0 !important; }
   .edit-field-wrap { padding:10px; }
   .modal .field input { font-size:16px; }
 
