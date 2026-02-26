@@ -1260,7 +1260,7 @@ function downloadFile(file) {
     .then(r=>r.blob()).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=file.name;a.click();URL.revokeObjectURL(a.href)})
 }
 
-const TEXT_EXTS  = new Set(['txt','md','markdown','log','ini','conf','cfg','env','yaml','yml','toml','json','jsonc','json5','html','htm','xml','svg','css','scss','sass','less','js','mjs','cjs','ts','tsx','jsx','vue','py','go','java','rs','c','cpp','cc','h','hpp','sh','bash','zsh','fish','ps1','bat','cmd','rb','php','pl','lua','r','swift','kt','cs','vb','sql','graphql','proto','dockerfile','makefile','csv','tsv','tex','rst','adoc','mod','sum','lock'])
+const TEXT_EXTS  = new Set(['txt','md','markdown','log','ini','conf','cfg','env','yaml','yml','toml','json','jsonc','json5','html','htm','xml','svg','css','scss','sass','less','js','mjs','cjs','ts','tsx','jsx','vue','py','go','java','rs','c','cpp','cc','h','hpp','sh','bash','zsh','fish','ps1','bat','cmd','rb','php','pl','lua','r','swift','kt','cs','vb','sql','graphql','proto','dockerfile','makefile','csv','tsv','tex','rst','adoc'])
 const IMAGE_EXTS = new Set(['jpg','jpeg','png','gif','webp','bmp','ico','tiff','tif','avif','svg'])
 function getFileViewMode(filename) {
   if (!filename||!filename.includes('.')) return 'text'
@@ -1289,14 +1289,14 @@ async function editFile(file) {
 async function forceEditFile() {
   if (!editTarget.value) return
   const file = editTarget.value
-  // 先设好模式和状态，再关弹窗重开，避免 v-if 销毁时状态被清
-  fileViewMode.value = 'text'
+  showEdit.value = false
+  await nextTick()
+  // 强制覆盖扩展名检测，直接用 text 模式
+  editTarget.value = file
   editContent.value = ''
   editError.value = ''
   previewUrl.value = ''
-  showEdit.value = false
-  await nextTick()
-  editTarget.value = file
+  fileViewMode.value = 'text'
   showEdit.value = true
   try {
     const { data } = await api.get('/files/content', { params: { path: file.path } })
