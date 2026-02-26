@@ -1618,7 +1618,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .field label { display:block; font-size:13px; font-weight:500; color:var(--gray-600); margin-bottom:8px; }
 .field input,.field textarea:not(.code-editor) { width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:14px; font-family:inherit; color:var(--gray-800); outline:none; resize:vertical; transition:var(--transition); box-sizing:border-box; }
 .field input:focus,.field textarea:not(.code-editor):focus { border-color:var(--blue-500); box-shadow:0 0 0 3px rgba(59,130,246,.1); }
-.edit-field-wrap { padding:16px; flex:1; display:flex; flex-direction:column; background:#F1F5F9; overflow:hidden; min-height:0; }
+.edit-field-wrap { padding:16px; flex:1; display:flex; flex-direction:column; background:#F1F5F9; overflow:hidden; min-height:0; height:0; }
 /* .code-editor 已由 CodeEditor.vue 组件接管，此处仅保留占位 */
 .upload-area { border:2px dashed var(--gray-200); border-radius:var(--radius); padding:36px; text-align:center; cursor:pointer; transition:var(--transition); margin-bottom:14px; }
 .upload-area:hover { border-color:var(--blue-400); background:var(--blue-50); }
