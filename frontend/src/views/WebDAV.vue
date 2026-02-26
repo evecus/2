@@ -57,8 +57,10 @@
       <div v-if="!settings.webdav_enabled" class="disabled-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12H3l9-9 9 9h-2"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
         <p>{{ t.webdavDisabled }}</p>
-        <router-link to="/settings" class="btn-go-settings">{{ t.settings }}</router-link>
+        <button class="btn-go-settings" @click="showSettings = true">{{ t.settings }}</button>
       </div>
+
+      <SettingsModal v-model="showSettings" @update:modelValue="onSettingsClose" />
 
       <!-- ===== 已启用内容 ===== -->
       <div v-else class="webdav-content">
@@ -163,6 +165,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
+import SettingsModal from '../components/SettingsModal.vue'
 import api from '../api'
 import { t } from '../i18n'
 import { useAuthStore } from '../stores/auth'
@@ -174,6 +177,14 @@ const currentPath = ref('/')
 const loading = ref(false)
 const copied = ref(false)
 const showMobileNav = ref(false)
+const showSettings = ref(false)
+
+async function onSettingsClose(val) {
+  if (!val) {
+    // 弹窗关闭时重新加载WebDAV设置
+    await loadSettings()
+  }
+}
 
 const davUrl = computed(() => `${window.location.origin}/dav/`)
 
