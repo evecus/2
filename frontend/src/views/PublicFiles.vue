@@ -56,10 +56,14 @@
         </div>
       </teleport>
 
+      <!--
+        面包屑：仅在浏览公开文件夹内部时显示。
+        顶层（currentPath="/"）是平铺视图，不显示面包屑。
+      -->
       <div v-if="currentPath !== '/'" class="breadcrumb">
-        <button class="crumb-home" @click="navigateTo('/')">
+        <button class="crumb-home" @click="backToRoot">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-          {{ t.home }}
+          {{ t.public }}
         </button>
         <template v-for="(seg, i) in pathSegments" :key="i">
           <span class="crumb-sep">/</span>
@@ -67,30 +71,44 @@
         </template>
       </div>
 
+      <!-- 顶层提示（平铺模式） -->
+      <div v-if="currentPath === '/'" class="flat-hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;flex-shrink:0;color:var(--blue-400)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>{{ lang === 'zh' ? '已直接显示所有公开的文件和文件夹，不显示上游目录' : 'All public files and folders are shown directly, without parent directories' }}</span>
+      </div>
+
       <div class="content">
         <div v-if="loading" class="loading-state"><div class="spinner-lg"></div></div>
         <div v-else-if="!files.length" class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-          <p>{{ lang === 'zh' ? '此目录下暂无公开文件' : 'No public files in this directory' }}</p>
+          <p>{{ lang === 'zh' ? '暂无公开文件' : 'No public files yet' }}</p>
           <span>{{ lang === 'zh' ? '在「我的文件」中将文件设为公开后将显示在这里' : 'Files marked public in My Files will appear here' }}</span>
         </div>
         <div v-else class="file-list">
           <div class="list-header">
             <span class="col-name">{{ t.name }}</span>
+            <span class="col-path" v-if="currentPath === '/'">{{ lang === 'zh' ? '位置' : 'Location' }}</span>
             <span class="col-size">{{ t.size }}</span>
             <span class="col-date">{{ t.modified }}</span>
             <span class="col-actions"></span>
           </div>
-          <div v-for="f in files" :key="f.path" class="file-row" @click="f.is_dir ? navigateTo(f.path) : null" :class="{ 'dir-row': f.is_dir }">
+          <div
+            v-for="f in files" :key="f.path"
+            class="file-row"
+            :class="{ 'dir-row': f.is_dir }"
+            @click="f.is_dir ? navigateTo(f.path) : null"
+          >
             <div class="col-name">
               <div class="file-icon" :class="f.is_dir ? 'folder-icon' : 'file-icon-default'">
                 <svg v-if="f.is_dir" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z"/></svg>
                 <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               </div>
               <span class="file-name">{{ f.name }}</span>
-              <span v-if="f.is_public" class="badge-pub">{{ lang === 'zh' ? '公开' : 'Public' }}</span>
-              <span v-else-if="f.is_dir" class="badge-partial">{{ lang === 'zh' ? '含公开文件' : 'Has public' }}</span>
             </div>
+            <!-- 顶层平铺时显示文件所在路径 -->
+            <span class="col-path" v-if="currentPath === '/'">
+              <span class="path-tag" :title="f.path">{{ parentDir(f.path) }}</span>
+            </span>
             <span class="col-size">{{ f.is_dir ? '—' : formatSize(f.size) }}</span>
             <span class="col-date">{{ formatDate(f.mod_time) }}</span>
             <div class="col-actions" @click.stop>
@@ -141,16 +159,24 @@ function doLogout() { logout(); router.push('/login') }
 
 const pathSegments = computed(() => currentPath.value.split('/').filter(Boolean))
 
+// 返回文件所在的父目录路径（用于顶层平铺时显示位置）
+function parentDir(path) {
+  const parts = path.split('/').filter(Boolean)
+  if (parts.length <= 1) return '/'
+  return '/' + parts.slice(0, -1).join('/')
+}
+
 function formatSize(bytes) {
   if (!bytes) return '0 B'
-  const units = ['B','KB','MB','GB']
+  const units = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(1024))
   return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i]
 }
 function formatDate(d) {
   if (!d) return ''
-  return new Date(d).toLocaleDateString('zh-CN', { year:'numeric', month:'short', day:'numeric' })
+  return new Date(d).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
 }
+
 async function load() {
   loading.value = true
   try {
@@ -160,11 +186,30 @@ async function load() {
   } catch {}
   loading.value = false
 }
-function navigateTo(path) { currentPath.value = path; load() }
-function navigateToIndex(i) { navigateTo('/' + pathSegments.value.slice(0, i + 1).join('/')) }
-async function setPrivate(f) {
-  await api.put('/files/visibility', { path: f.path, is_public: false }); load()
+
+// 返回顶层（平铺视图）
+function backToRoot() {
+  currentPath.value = '/'
+  load()
 }
+
+// 进入一个公开文件夹
+function navigateTo(path) {
+  currentPath.value = path
+  load()
+}
+
+function navigateToIndex(i) {
+  navigateTo('/' + pathSegments.value.slice(0, i + 1).join('/'))
+}
+
+async function setPrivate(f) {
+  await api.put('/files/visibility', { path: f.path, is_public: false })
+  // 取消公开后回到顶层（平铺视图会自动更新）
+  currentPath.value = '/'
+  load()
+}
+
 onMounted(load)
 </script>
 
@@ -181,6 +226,10 @@ onMounted(load)
 .btn-settings svg { width: 17px; height: 17px; }
 .btn-settings:hover { border-color: var(--blue-400); color: var(--blue-600); background: var(--blue-50); }
 
+/* 平铺提示条 */
+.flat-hint { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--gray-500); background: var(--blue-50); border-bottom: 1px solid rgba(59,130,246,.1); padding: 8px 28px; }
+
+/* 面包屑 */
 .breadcrumb { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 10px 28px 0; }
 .crumb-home, .crumb-item { display: flex; align-items: center; gap: 5px; background: none; border: none; color: var(--blue-600); font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: var(--transition); }
 .crumb-home svg { width: 14px; height: 14px; }
@@ -195,11 +244,12 @@ onMounted(load)
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 260px; color: var(--gray-300); gap: 10px; }
 .empty-state svg { width: 56px; height: 56px; }
 .empty-state p { font-size: 15px; font-weight: 500; color: var(--gray-400); }
-.empty-state span { font-size: 13px; color: var(--gray-300); }
+.empty-state span { font-size: 13px; color: var(--gray-300); text-align: center; }
 
 .file-list { background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; border: 1px solid var(--gray-100); }
-.list-header { display: grid; grid-template-columns: 1fr 90px 130px 110px; padding: 10px 20px; background: var(--gray-50); border-bottom: 1px solid var(--gray-100); font-size: 11px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; }
-.file-row { display: grid; grid-template-columns: 1fr 90px 130px 110px; padding: 11px 20px; border-bottom: 1px solid var(--gray-50); align-items: center; transition: var(--transition); }
+/* 顶层平铺：有位置列；子目录浏览：无位置列 */
+.list-header { display: grid; grid-template-columns: 1.2fr 0.8fr 80px 120px 100px; padding: 10px 20px; background: var(--gray-50); border-bottom: 1px solid var(--gray-100); font-size: 11px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; align-items: center; }
+.file-row { display: grid; grid-template-columns: 1.2fr 0.8fr 80px 120px 100px; padding: 11px 20px; border-bottom: 1px solid var(--gray-50); align-items: center; transition: var(--transition); }
 .file-row:last-child { border-bottom: none; }
 .dir-row { cursor: pointer; }
 .dir-row:hover { background: var(--blue-50); }
@@ -211,8 +261,9 @@ onMounted(load)
 .file-icon.file-icon-default { background: var(--blue-50); color: var(--blue-500); }
 .file-icon svg { width: 15px; height: 15px; }
 .file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--gray-700); }
-.badge-pub { padding: 2px 7px; background: rgba(16,185,129,0.12); color: #10B981; border-radius: 20px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
-.badge-partial { padding: 2px 7px; background: rgba(245,158,11,0.12); color: #D97706; border-radius: 20px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
+
+.col-path { min-width: 0; }
+.path-tag { display: inline-block; max-width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--gray-500); background: var(--gray-100); padding: 2px 7px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .col-size, .col-date { font-size: 12px; color: var(--gray-400); }
 .col-actions { display: flex; justify-content: flex-end; gap: 2px; }
@@ -241,21 +292,32 @@ onMounted(load)
 .mob-nav-logout:hover { background: rgba(239,68,68,.08) !important; color: #EF4444 !important; }
 .mob-nav-divider { height: 1px; background: var(--gray-100); margin: 8px 4px; }
 
+/* ─── 移动端适配 ─────────────────────────────────────────── */
 @media (max-width: 768px) {
   .desktop-header { display: none; }
   .mobile-header  { display: flex; padding: 10px 14px; min-height: 52px; gap: 10px; }
+  .flat-hint { padding: 7px 16px; font-size: 11px; }
   .breadcrumb { padding: 8px 16px 0; }
   .content { padding: 12px 16px 20px; }
-  .list-header { grid-template-columns: 1fr 70px 88px !important; padding: 8px 12px; }
-  .file-row  { grid-template-columns: 1fr 70px 88px !important; padding: 10px 12px; }
-  .list-header > *:nth-child(3), .file-row > *:nth-child(3) { display: none; }
-  .col-size,.col-date { font-size: 11px; }
-  .act-btn { width: 26px; height: 26px; }
+
+  /* 隐藏位置列和日期列，只保留 名称 + 大小 + 操作 */
+  .list-header { grid-template-columns: 1fr 60px 80px !important; padding: 8px 12px; }
+  .file-row    { grid-template-columns: 1fr 60px 80px !important; padding: 10px 12px; }
+  .list-header > .col-path,
+  .file-row    > .col-path,
+  .list-header > .col-date,
+  .file-row    > .col-date { display: none; }
+
+  .file-name { font-size: 13px; }
+  .col-size  { font-size: 11px; }
+  .act-btn   { width: 26px; height: 26px; }
 }
 
 @media (max-width: 480px) {
-  .list-header { grid-template-columns: 1fr 88px !important; }
-  .file-row  { grid-template-columns: 1fr 88px !important; }
-  .list-header > *:nth-child(2), .file-row > *:nth-child(2) { display: none; }
+  /* 极小屏：只保留 名称 + 操作 */
+  .list-header { grid-template-columns: 1fr 80px !important; }
+  .file-row    { grid-template-columns: 1fr 80px !important; }
+  .list-header > .col-size,
+  .file-row    > .col-size { display: none; }
 }
 </style>
