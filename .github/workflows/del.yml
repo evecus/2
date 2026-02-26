@@ -1,44 +1,70 @@
-name: 删除代码
+name: Total Cleanup (Files, Tags, Releases)
 
 on:
-  # 建议设为手动触发，防止误删
-  workflow_dispatch:
+  workflow_dispatch: # 仅限手动触发，防止灾难性意外
 
 jobs:
-  delete-files:
+  cleanup:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 赋予写入权限以提交更改
+      contents: write # 必须：用于删除 tags 和提交文件
+      discussions: write # 如果有关联的讨论建议开启
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 0 # 获取完整历史以确保推送顺利
+          fetch-depth: 0
 
+      # 1. 删除所有本地和远程 Tags
+      - name: Delete all tags
+        run: |
+          # 获取所有远程标签并逐个删除
+          git fetch --tags
+          tags=$(git tag)
+          if [ -n "$tags" ]; then
+            for tag in $tags; do
+              git push origin --delete "$tag"
+              echo "Deleted tag: $tag"
+            done
+          else
+            echo "No tags found."
+          fi
+
+      # 2. 删除所有 GitHub Releases
+      - name: Delete all releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 使用 GitHub CLI 获取所有 release 并删除
+          releases=$(gh release list --limit 1000 | awk '{print $1}')
+          if [ -n "$releases" ]; then
+            for tag in $releases; do
+              gh release delete "$tag" --yes
+              echo "Deleted release: $tag"
+            done
+          else
+            echo "No releases found."
+          fi
+
+      # 3. 清理文件系统 (保留 .github)
       - name: Remove all files except .github
         run: |
-          # 开启扩展通配符模式 (extglob)
           shopt -s extglob
-          
-          # 删除当前目录下除了 .github 以外的所有内容
-          # !(pattern) 会匹配所有不符合 pattern 的项
           rm -rf !(.github)
-          
-          echo "Cleanup completed. Remaining files:"
           ls -a
 
-      - name: Commit and Push changes
+      # 4. 提交更改
+      - name: Commit and Push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 检查是否有文件被删除（避免空提交报错）
           if [ -n "$(git status --porcelain)" ]; then
             git add .
-            git commit -m "chore: cleanup main branch, keeping only .github folder"
-            git push origin main
+            git commit -m "chore: complete reset (removed all files, tags, and releases)"
+            git push origin main --force
           else
-            echo "No changes to commit"
+            echo "No file changes to commit"
           fi
