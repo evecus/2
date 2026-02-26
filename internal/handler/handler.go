@@ -429,14 +429,31 @@ func (h *Handler) SetVisibility(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 
-// ListPublicFiles 返回公开文件列表（需登录，用于管理界面）
+// ListPublicFiles 返回公开文件列表。
+//
+// 顶层（path="/" 或留空）：调用 GetAllPublicFlat，把所有公开条目平铺展示，
+// 不显示父文件夹，只显示被直接标记为公开的文件/文件夹本身。
+//
+// 子目录（path 非根）：调用 ListPublic，仅展示该目录下有 is_public=true 标记的直接子项。
+// 这用于用户点进一个公开文件夹后浏览其内部内容。
 func (h *Handler) ListPublicFiles(c *gin.Context) {
 	dir := c.Query("path")
 	if dir == "" {
 		dir = "/"
 	}
-	list, err := h.files.ListPublic(dir)
-	if err != nil {
+
+	var (
+		list []files.FileInfo
+		err  error
+	)
+	if dir == "/" {
+		// 顶层：平铺所有公开条目，无论它们在多深的位置
+		list, err = h.files.GetAllPublicFlat()
+	} else {
+		// 子目录：只展示该目录下直接标记为公开的子项
+		list, err = h.files.ListPublic(dir)
+	}
+	if err != nil || list == nil {
 		c.JSON(200, gin.H{"files": []interface{}{}, "path": dir})
 		return
 	}
