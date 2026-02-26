@@ -1734,6 +1734,14 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   .dir-tree { max-height:200px; }
   .ctx-menu { min-width:180px; }
   .ctx-item { padding:12px 16px; font-size:14px; }
+
+  /* 搜索目录输入框移动端适配 */
+  .search-dir-input { font-size:16px; } /* 防止 iOS 自动缩放 */
+  .search-dir-prefix { font-size:16px; height:44px; padding:0 10px; }
+  .search-scope-preview { padding:8px 10px; gap:4px; }
+  .search-scope-preview strong { font-size:11px; word-break:break-all; }
+  .search-dir-hint { font-size:11px; }
+  .search-result-scope { margin:0 0 10px; }
 }
 
 @media (max-width: 480px) {
@@ -1744,5 +1752,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   .file-icon { width:28px; height:28px; border-radius:6px; }
   .file-icon svg { width:13px; height:13px; }
   .mob-crumb-item { max-width:80px; }
+  /* 极小屏隐藏预览行的 Scope 文字，只留路径 */
+  .search-scope-preview > span:first-of-type { display:none; }
 }
 </style>
