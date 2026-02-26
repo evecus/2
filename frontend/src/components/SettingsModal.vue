@@ -127,6 +127,10 @@
                 <input v-model="webdavForm.subPath" type="text" placeholder="webdav" />
               </div>
               <div class="sm-field">
+                <label>{{ lang === 'zh' ? 'WebDAV 独立用户名（留空则使用 CloudOne 账户）' : 'WebDAV username (blank = use CloudOne account)' }}</label>
+                <input v-model="webdavForm.username" type="text" :placeholder="lang === 'zh' ? '留空则使用 CloudOne 账户名' : 'Leave blank to use account username'" />
+              </div>
+              <div class="sm-field">
                 <label>{{ lang === 'zh' ? 'WebDAV 独立密码（留空则使用账户密码）' : 'WebDAV password (blank = use account password)' }}</label>
                 <input v-model="webdavForm.password" type="password" :placeholder="lang === 'zh' ? '留空则使用账户密码' : 'Leave blank to use account password'" />
               </div>
@@ -219,7 +223,7 @@ function switchLang(l) {
 }
 
 // WebDAV
-const webdavForm = ref({ enabled: false, subPath: '', password: '' })
+const webdavForm = ref({ enabled: false, subPath: '', username: '', password: '' })
 const savedWebDAV = ref(false)
 
 async function loadWebDAV() {
@@ -227,6 +231,7 @@ async function loadWebDAV() {
     const { data } = await api.get('/webdav/settings')
     webdavForm.value.enabled = data.webdav_enabled
     webdavForm.value.subPath = data.webdav_sub_path || ''
+    webdavForm.value.username = data.webdav_username || ''
     webdavForm.value.password = ''
   } catch {}
 }
@@ -235,6 +240,7 @@ async function saveWebDAV() {
   await api.put('/webdav/settings', {
     webdav_enabled: webdavForm.value.enabled,
     webdav_sub_path: webdavForm.value.subPath,
+    webdav_username: webdavForm.value.username,
     webdav_password: webdavForm.value.password,
   })
   savedWebDAV.value = true
