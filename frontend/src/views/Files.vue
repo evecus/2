@@ -1034,7 +1034,7 @@ function onTouchStart(e, file) {
     if (!touchMoved) {
       const menuW = 200
       const x = window.innerWidth - menuW - 8
-      const y = 72  // 固定在顶部导航栏下方
+      const y = 280  // 固定在第二个文件位置附近，确保菜单始终完整显示
       ctxMenu.value = { show:true, x, y, file }
     }
   }, 500)
