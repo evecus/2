@@ -113,9 +113,9 @@ func main() {
 			// 开发环境允许 localhost，生产环境根据需要调整
 			return true
 		},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Disposition"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK", "HEAD"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Depth", "Destination", "Lock-Token", "Overwrite", "Timeout", "If"},
+		ExposeHeaders:    []string{"Content-Disposition", "DAV", "Lock-Token"},
 		AllowCredentials: false, // 使用 Bearer token，不需要 credentials
 	}))
 
@@ -163,11 +163,22 @@ func main() {
 			authed.GET("/share", h.ListShares)
 			authed.DELETE("/share/:id", h.DeleteShare)
 
+			// WebDAV 设置（已登录用户管理）
+			authed.GET("/webdav/settings", h.GetWebDAVSettings)
+			authed.PUT("/webdav/settings", h.UpdateWebDAVSettings)
+
 		}
 
 		// 分享码 API（无需登录）
 		api.GET("/s/:code", h.AccessShare)
 		api.GET("/s/:code/download", h.DownloadShare)
+	}
+
+	// WebDAV 协议路由（Basic Auth，独立于 JWT）
+	davMethods := []string{"GET", "HEAD", "PUT", "DELETE", "OPTIONS", "PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK"}
+	for _, method := range davMethods {
+		r.Handle(method, "/dav", h.WebDAVMiddleware(), h.WebDAVHandler)
+		r.Handle(method, "/dav/*path", h.WebDAVMiddleware(), h.WebDAVHandler)
 	}
 
 	// 公开文件 API（无需登录）
