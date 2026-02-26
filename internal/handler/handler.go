@@ -1296,3 +1296,341 @@ func untar(r io.Reader, dest string) error {
 	}
 	return nil
 }
+
+// ── WebDAV ────────────────────────────────────────────────────────────────────
+
+// GetWebDAVSettings 返回 WebDAV 配置（已登录用户）
+func (h *Handler) GetWebDAVSettings(c *gin.Context) {
+	var s auth.Settings
+	h.db.First(&s)
+	c.JSON(200, gin.H{
+		"webdav_enabled":  s.WebDAVEnabled,
+		"webdav_sub_path": s.WebDAVSubPath,
+		"webdav_password": s.WebDAVPassword,
+	})
+}
+
+// UpdateWebDAVSettings 保存 WebDAV 配置
+func (h *Handler) UpdateWebDAVSettings(c *gin.Context) {
+	var s auth.Settings
+	h.db.First(&s)
+	var req struct {
+		Enabled  bool   `json:"webdav_enabled"`
+		SubPath  string `json:"webdav_sub_path"`
+		Password string `json:"webdav_password"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	s.WebDAVEnabled = req.Enabled
+	s.WebDAVSubPath = req.SubPath
+	s.WebDAVPassword = req.Password
+	h.db.Save(&s)
+	c.JSON(200, gin.H{
+		"webdav_enabled":  s.WebDAVEnabled,
+		"webdav_sub_path": s.WebDAVSubPath,
+		"webdav_password": s.WebDAVPassword,
+	})
+}
+
+// WebDAVRoot 返回 WebDAV 的根目录（storageDir + subPath，留空则用 /webdav 子目录）
+func (h *Handler) webdavRoot() string {
+	var s auth.Settings
+	h.db.First(&s)
+	base := h.files.Root()
+	sub := strings.TrimSpace(s.WebDAVSubPath)
+	if sub == "" {
+		sub = "webdav"
+	}
+	// 清理路径，防止穿越
+	sub = filepath.Clean(strings.TrimLeft(sub, "/"))
+	root := filepath.Join(base, sub)
+	os.MkdirAll(root, 0755)
+	return root
+}
+
+// WebDAVMiddleware 校验 Basic Auth，支持独立密码或回落到 CloudOne 账户密码
+func (h *Handler) WebDAVMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 先检查 WebDAV 是否启用
+		var s auth.Settings
+		h.db.First(&s)
+		if !s.WebDAVEnabled {
+			c.Header("WWW-Authenticate", `Basic realm="CloudOne WebDAV"`)
+			c.AbortWithStatus(503)
+			return
+		}
+
+		username, password, ok := c.Request.BasicAuth()
+		if !ok {
+			c.Header("WWW-Authenticate", `Basic realm="CloudOne WebDAV"`)
+			c.AbortWithStatus(401)
+			return
+		}
+
+		// 查找用户
+		var user auth.User
+		if err := h.db.Where("username = ?", username).First(&user).Error; err != nil {
+			c.Header("WWW-Authenticate", `Basic realm="CloudOne WebDAV"`)
+			c.AbortWithStatus(401)
+			return
+		}
+
+		// 优先用 WebDAV 独立密码（明文存储，直接比对）
+		if s.WebDAVPassword != "" {
+			if password != s.WebDAVPassword {
+				c.Header("WWW-Authenticate", `Basic realm="CloudOne WebDAV"`)
+				c.AbortWithStatus(401)
+				return
+			}
+		} else {
+			// 回落到 CloudOne 密码（bcrypt）
+			if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+				c.Header("WWW-Authenticate", `Basic realm="CloudOne WebDAV"`)
+				c.AbortWithStatus(401)
+				return
+			}
+		}
+		c.Next()
+	}
+}
+
+// WebDAVHandler 处理所有 WebDAV 协议请求
+func (h *Handler) WebDAVHandler(c *gin.Context) {
+	var s auth.Settings
+	h.db.First(&s)
+	if !s.WebDAVEnabled {
+		c.Status(503)
+		return
+	}
+
+	root := h.webdavRoot()
+	stripPrefix := "/dav"
+
+	method := c.Request.Method
+	rawPath := c.Request.URL.Path
+
+	// 去掉 /dav 前缀，得到相对路径
+	relPath := strings.TrimPrefix(rawPath, stripPrefix)
+	if relPath == "" {
+		relPath = "/"
+	}
+
+	// 安全检查：不允许路径穿越
+	absTarget := filepath.Join(root, filepath.FromSlash(relPath))
+	if !strings.HasPrefix(absTarget, root) {
+		c.Status(403)
+		return
+	}
+
+	switch method {
+	case "OPTIONS":
+		c.Header("DAV", "1, 2")
+		c.Header("Allow", "OPTIONS, GET, HEAD, PUT, DELETE, MKCOL, COPY, MOVE, PROPFIND, PROPPATCH, LOCK, UNLOCK")
+		c.Header("MS-Author-Via", "DAV")
+		c.Status(200)
+
+	case "PROPFIND":
+		h.davPropfind(c, root, relPath, absTarget)
+
+	case "GET", "HEAD":
+		info, err := os.Stat(absTarget)
+		if err != nil {
+			c.Status(404)
+			return
+		}
+		if info.IsDir() {
+			h.davPropfind(c, root, relPath, absTarget)
+			return
+		}
+		c.File(absTarget)
+
+	case "PUT":
+		if err := os.MkdirAll(filepath.Dir(absTarget), 0755); err != nil {
+			c.Status(500)
+			return
+		}
+		f, err := os.Create(absTarget)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		defer f.Close()
+		io.Copy(f, c.Request.Body)
+		c.Status(201)
+
+	case "DELETE":
+		if err := os.RemoveAll(absTarget); err != nil {
+			c.Status(500)
+			return
+		}
+		c.Status(204)
+
+	case "MKCOL":
+		if err := os.MkdirAll(absTarget, 0755); err != nil {
+			c.Status(500)
+			return
+		}
+		c.Status(201)
+
+	case "COPY", "MOVE":
+		dest := c.Request.Header.Get("Destination")
+		if dest == "" {
+			c.Status(400)
+			return
+		}
+		// 解析目标路径
+		destPath := dest
+		if idx := strings.Index(dest, "/dav"); idx >= 0 {
+			destPath = dest[idx+len("/dav"):]
+		}
+		absDest := filepath.Join(root, filepath.FromSlash(destPath))
+		if !strings.HasPrefix(absDest, root) {
+			c.Status(403)
+			return
+		}
+		os.MkdirAll(filepath.Dir(absDest), 0755)
+		if method == "COPY" {
+			if err := copyPath(absTarget, absDest); err != nil {
+				c.Status(500)
+				return
+			}
+			c.Status(201)
+		} else {
+			if err := os.Rename(absTarget, absDest); err != nil {
+				c.Status(500)
+				return
+			}
+			c.Status(201)
+		}
+
+	case "LOCK":
+		// 返回一个假锁，满足 macOS Finder 等客户端要求
+		token := "urn:uuid:cloudone-lock-" + strconv.FormatInt(time.Now().UnixNano(), 16)
+		c.Header("Lock-Token", "<"+token+">")
+		c.Header("Content-Type", "application/xml; charset=utf-8")
+		c.String(200, `<?xml version="1.0" encoding="utf-8"?>
+<D:prop xmlns:D="DAV:"><D:lockdiscovery><D:activelock>
+<D:locktype><D:write/></D:locktype>
+<D:lockscope><D:exclusive/></D:lockscope>
+<D:depth>infinity</D:depth>
+<D:timeout>Second-3600</D:timeout>
+<D:locktoken><D:href>`+token+`</D:href></D:locktoken>
+</D:activelock></D:lockdiscovery></D:prop>`)
+
+	case "UNLOCK":
+		c.Status(204)
+
+	case "PROPPATCH":
+		c.Header("Content-Type", "application/xml; charset=utf-8")
+		c.String(207, `<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:"></D:multistatus>`)
+
+	default:
+		c.Status(405)
+	}
+}
+
+// davPropfind 生成 PROPFIND 响应（XML）
+func (h *Handler) davPropfind(c *gin.Context, root, relPath, absTarget string) {
+	info, err := os.Stat(absTarget)
+	if err != nil {
+		c.Status(404)
+		return
+	}
+
+	depth := c.Request.Header.Get("Depth")
+	if depth == "" {
+		depth = "1"
+	}
+
+	var entries []os.FileInfo
+	if info.IsDir() && depth != "0" {
+		dirEntries, err := os.ReadDir(absTarget)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		for _, de := range dirEntries {
+			fi, err := de.Info()
+			if err == nil {
+				entries = append(entries, fi)
+			}
+		}
+	}
+
+	c.Header("Content-Type", "application/xml; charset=utf-8")
+	c.Status(207)
+
+	c.Writer.WriteString(`<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">`)
+
+	// 写当前路径自身
+	writePropfindEntry(c.Writer, relPath, info)
+
+	// 写子项
+	if info.IsDir() && depth != "0" {
+		childBase := relPath
+		if !strings.HasSuffix(childBase, "/") {
+			childBase += "/"
+		}
+		for _, child := range entries {
+			childRel := childBase + child.Name()
+			writePropfindEntry(c.Writer, childRel, child)
+		}
+	}
+
+	c.Writer.WriteString(`</D:multistatus>`)
+}
+
+func writePropfindEntry(w gin.ResponseWriter, relPath string, info os.FileInfo) {
+	href := "/dav" + relPath
+	if info.IsDir() && !strings.HasSuffix(href, "/") {
+		href += "/"
+	}
+	modTime := info.ModTime().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
+	resourceType := ""
+	contentLength := ""
+	if info.IsDir() {
+		resourceType = "<D:resourcetype><D:collection/></D:resourcetype>"
+	} else {
+		resourceType = "<D:resourcetype/>"
+		contentLength = fmt.Sprintf("<D:getcontentlength>%d</D:getcontentlength>", info.Size())
+	}
+	fmt.Fprintf(w, `<D:response><D:href>%s</D:href><D:propstat><D:prop>%s%s<D:getlastmodified>%s</D:getlastmodified><D:displayname>%s</D:displayname></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`,
+		href, resourceType, contentLength, modTime, info.Name())
+}
+
+// copyPath 递归复制文件或目录
+func copyPath(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		if err := os.MkdirAll(dst, info.Mode()); err != nil {
+			return err
+		}
+		entries, err := os.ReadDir(src)
+		if err != nil {
+			return err
+		}
+		for _, e := range entries {
+			if err := copyPath(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
+}
