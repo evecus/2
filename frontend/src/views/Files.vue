@@ -1032,14 +1032,9 @@ function onTouchStart(e, file) {
   touchMoved = false
   longPressTimer = setTimeout(() => {
     if (!touchMoved) {
-      const touch = e.touches[0]
-      const baseH = file.is_dir ? 360 : 390
-      const extraH = isArchive(file.name) ? 36 : 0
-      const menuW = 200, menuH = baseH + extraH
-      let x = touch.clientX, y = touch.clientY
-      if (x + menuW > window.innerWidth)  x = window.innerWidth  - menuW - 8
-      if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8
-      if (y < 8) y = 8
+      const menuW = 200
+      const x = window.innerWidth - menuW - 8
+      const y = 72  // 固定在顶部导航栏下方
       ctxMenu.value = { show:true, x, y, file }
     }
   }, 500)
