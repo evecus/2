@@ -203,13 +203,13 @@ async function loadSettings() {
 async function loadFiles(path) {
   loading.value = true
   try {
-    // 复用 /api/files，传入 WebDAV 子目录作为根路径前缀
     const subPath = settings.value.webdav_sub_path || 'webdav'
     const apiPath = path === '/' ? '/' + subPath : '/' + subPath + path
     const { data } = await api.get('/files', { params: { path: apiPath } })
-    files.value = data.map(f => ({
+    // 后端返回 { files: [...], path: "..." } 或直接数组，兼容两种
+    const list = Array.isArray(data) ? data : (data.files || [])
+    files.value = list.map(f => ({
       ...f,
-      // 重新映射 path 为相对于 WebDAV 根的路径
       path: f.path.replace(new RegExp('^/' + subPath), '') || '/'
     }))
     currentPath.value = path
@@ -239,10 +239,25 @@ function handleClick(file) {
 
 async function copyText(text) {
   try {
-    await navigator.clipboard.writeText(text)
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // HTTP环境fallback
+      const el = document.createElement('textarea')
+      el.value = text
+      el.style.position = 'fixed'
+      el.style.opacity = '0'
+      document.body.appendChild(el)
+      el.focus()
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
     copied.value = true
     setTimeout(() => copied.value = false, 2000)
-  } catch {}
+  } catch (e) {
+    console.error('复制失败', e)
+  }
 }
 
 function getExt(name) {
