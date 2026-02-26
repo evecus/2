@@ -1033,8 +1033,12 @@ function onTouchStart(e, file) {
   longPressTimer = setTimeout(() => {
     if (!touchMoved) {
       const menuW = 200
+      const baseH = file.is_dir ? 360 : 390
+      const extraH = isArchive(file.name) ? 36 : 0
+      const menuH = baseH + extraH
       const x = window.innerWidth - menuW - 8
-      const y = 280  // 固定在第二个文件位置附近，确保菜单始终完整显示
+      // 固定 y=224，对应长按第二个文件时弹窗顶部位置
+      const y = 224
       ctxMenu.value = { show:true, x, y, file }
     }
   }, 500)
