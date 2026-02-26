@@ -423,7 +423,6 @@
           <div class="modal-titlebar">
             <h3>
               <span v-if="fileViewMode==='image'">{{ lang==='zh'?'预览图片':'Preview' }}</span>
-              <span v-else-if="fileViewMode==='unsupported'">{{ lang==='zh'?'无法预览':'Cannot Preview' }}</span>
               <span v-else>{{ t.editFileTitle }}</span>:
               <span class="edit-filename">{{ editTarget?.name }}</span>
             </h3>
@@ -436,17 +435,20 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <p>{{ lang==='zh'?'此文件类型不支持在线预览或编辑':'This file type cannot be previewed or edited online' }}</p>
             <span class="unsupported-ext">.{{ editTarget?.name?.split('.').pop()?.toUpperCase() }}</span>
-            <button class="btn-download-hint" @click="downloadFile(editTarget);showEdit=false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              {{ t.download }}
-            </button>
           </div>
           <div v-else-if="fileViewMode==='text'" class="edit-field-wrap">
             <p v-if="editError" class="edit-error">{{ editError }}</p>
             <CodeEditor v-else v-model="editContent" :filename="editTarget?.name || ''" />
           </div>
-          <div class="modal-actions">
-            <button class="btn-ghost" @click="showEdit=false">{{ t.cancel }}</button>
+          <div class="modal-actions" :class="{ 'modal-actions-unsupported': fileViewMode==='unsupported' }">
+            <button v-if="fileViewMode==='unsupported'" class="btn-ghost btn-action-mob" @click="forceEditFile">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              {{ lang==='zh'?'尝试编辑':'Try Edit' }}
+            </button>
+            <button v-if="fileViewMode==='unsupported'" class="btn-ghost btn-action-mob" @click="downloadFile(editTarget);showEdit=false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              {{ t.download }}
+            </button>
             <button v-if="fileViewMode==='text'&&!editError" class="btn-primary-sm" @click="doSaveFile">{{ t.saveFile }}</button>
           </div>
         </div>
@@ -1282,6 +1284,19 @@ async function editFile(file) {
   try { const {data}=await api.get('/files/content',{params:{path:file.path}}); editContent.value=data.content }
   catch(e) { editError.value=e.response?.data?.error||t.value.binaryFile }
 }
+// 强制以文本模式打开（用于 unsupported 文件尝试编辑）
+async function forceEditFile() {
+  if (!editTarget.value) return
+  fileViewMode.value = 'text'
+  editContent.value = ''
+  editError.value = ''
+  try {
+    const { data } = await api.get('/files/content', { params: { path: editTarget.value.path } })
+    editContent.value = data.content
+  } catch(e) {
+    editError.value = e.response?.data?.error || (lang.value === 'zh' ? '无法读取文件内容' : 'Cannot read file content')
+  }
+}
 async function doSaveFile() {
   try { await api.put('/files/content',{path:editTarget.value.path,content:editContent.value}); showEdit.value=false; load() }
   catch(e) { editError.value=e.response?.data?.error||'Save failed' }
@@ -1630,12 +1645,15 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .upload-item .pending { color:var(--gray-400); }
 .preview-img-wrap { display:flex; justify-content:center; align-items:center; padding:20px; flex:1; min-height:200px; background:var(--gray-50); border-radius:12px; }
 .preview-img { max-width:100%; max-height:60vh; object-fit:contain; border-radius:8px; box-shadow:var(--shadow-sm); }
-.unsupported-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px; gap:12px; flex:1; }
+.unsupported-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 20px; gap:14px; flex:1; }
+/* unsupported 底栏两按钮左对齐排列 */
+.modal-actions-unsupported { justify-content:flex-start; gap:8px; }
+/* 移动端底栏按钮加大点击区域 */
+.btn-action-mob { display:flex; align-items:center; gap:6px; }
 .unsupported-wrap svg { width:56px; height:56px; color:var(--gray-300); }
 .unsupported-wrap p { font-size:14px; color:var(--gray-500); font-weight:500; }
 .unsupported-ext { padding:4px 14px; background:var(--gray-100); color:var(--gray-500); border-radius:20px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; }
-.btn-download-hint { display:flex; align-items:center; gap:6px; margin-top:8px; padding:10px 20px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); background:white; color:var(--gray-600); font-size:14px; font-weight:500; font-family:inherit; cursor:pointer; transition:var(--transition); }
-.btn-download-hint:hover { border-color:var(--blue-400); color:var(--blue-600); background:var(--blue-50); }
+
 .perm-grid { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
 .perm-row { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--gray-50); border-radius:10px; }
 .perm-label { font-size:13px; font-weight:600; color:var(--gray-600); width:72px; flex-shrink:0; }
@@ -1900,6 +1918,23 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   .modal-xl { max-height:100vh !important; border-radius:0 !important; }
   .edit-field-wrap { padding:10px; }
   .modal .field input { font-size:16px; }
+
+  /* 编辑弹窗标题栏：文件名截断，不换行 */
+  .modal-xl .modal-titlebar { padding:14px 16px 12px; }
+  .modal-xl .modal-titlebar h3 { font-size:15px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; flex:1; }
+  .edit-filename { display:inline-block; max-width:55vw; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom; white-space:nowrap; }
+
+  /* unsupported 内容区移动端紧凑 */
+  .unsupported-wrap { padding:20px 16px; gap:10px; }
+  .unsupported-wrap svg { width:44px; height:44px; }
+  .unsupported-wrap p { font-size:13px; text-align:center; }
+
+  /* 底栏按钮移动端：加大点击区域，两按钮各占一半 */
+  .modal-actions-unsupported { padding:12px 16px; gap:10px; }
+  .modal-actions-unsupported .btn-action-mob { flex:1; justify-content:center; padding:11px 10px; font-size:14px; }
+
+  /* iOS safe area 底部留白，防止 home 条遮住按钮 */
+  .modal-xl .modal-actions { padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px)); }
   .dir-tree { max-height:200px; }
   .ctx-menu { min-width:180px; }
   .ctx-item { padding:12px 16px; font-size:14px; }
