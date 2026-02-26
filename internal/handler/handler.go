@@ -1306,6 +1306,7 @@ func (h *Handler) GetWebDAVSettings(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"webdav_enabled":  s.WebDAVEnabled,
 		"webdav_sub_path": s.WebDAVSubPath,
+		"webdav_username": s.WebDAVUsername,
 		"webdav_password": s.WebDAVPassword,
 	})
 }
@@ -1317,6 +1318,7 @@ func (h *Handler) UpdateWebDAVSettings(c *gin.Context) {
 	var req struct {
 		Enabled  bool   `json:"webdav_enabled"`
 		SubPath  string `json:"webdav_sub_path"`
+		Username string `json:"webdav_username"`
 		Password string `json:"webdav_password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1325,11 +1327,13 @@ func (h *Handler) UpdateWebDAVSettings(c *gin.Context) {
 	}
 	s.WebDAVEnabled = req.Enabled
 	s.WebDAVSubPath = req.SubPath
+	s.WebDAVUsername = req.Username
 	s.WebDAVPassword = req.Password
 	h.db.Save(&s)
 	c.JSON(200, gin.H{
 		"webdav_enabled":  s.WebDAVEnabled,
 		"webdav_sub_path": s.WebDAVSubPath,
+		"webdav_username": s.WebDAVUsername,
 		"webdav_password": s.WebDAVPassword,
 	})
 }
@@ -1350,7 +1354,7 @@ func (h *Handler) webdavRoot() string {
 	return root
 }
 
-// WebDAVMiddleware 校验 Basic Auth，支持独立密码或回落到 CloudOne 账户密码
+// WebDAVMiddleware 校验 Basic Auth，支持独立用户名+密码或回落到 CloudOne 账户密码
 func (h *Handler) WebDAVMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 先检查 WebDAV 是否启用
@@ -1369,7 +1373,23 @@ func (h *Handler) WebDAVMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 查找用户
+		// 如果设置了独立用户名，直接用独立用户名+密码校验（不查数据库用户）
+		if s.WebDAVUsername != "" {
+			if username != s.WebDAVUsername {
+				c.Header("WWW-Authenticate", `Basic realm="CloudOne WebDAV"`)
+				c.AbortWithStatus(401)
+				return
+			}
+			if s.WebDAVPassword != "" && password != s.WebDAVPassword {
+				c.Header("WWW-Authenticate", `Basic realm="CloudOne WebDAV"`)
+				c.AbortWithStatus(401)
+				return
+			}
+			c.Next()
+			return
+		}
+
+		// 未设置独立用户名：查找 CloudOne 账户
 		var user auth.User
 		if err := h.db.Where("username = ?", username).First(&user).Error; err != nil {
 			c.Header("WWW-Authenticate", `Basic realm="CloudOne WebDAV"`)
