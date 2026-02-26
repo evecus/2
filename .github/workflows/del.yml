@@ -1,4 +1,4 @@
-name: Total Cleanup (Files, Tags, Releases)
+name: 删除代码
 
 on:
   workflow_dispatch: # 仅限手动触发，防止灾难性意外
