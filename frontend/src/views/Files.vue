@@ -530,7 +530,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
                 {{ lang==='zh'?'大小':'Size' }}
               </span>
-              <span class="info-value">{{ formatSize(infoTarget.size) }} <span class="info-bytes">({{ infoTarget.size?.toLocaleString() }} bytes)</span></span>
+              <span class="info-value">{{ formatSize(infoTarget.size) }}<span class="info-bytes"> ({{ infoTarget.size?.toLocaleString() }} bytes)</span></span>
             </div>
             <div class="info-row">
               <span class="info-label">
@@ -1013,11 +1013,14 @@ function exitSelectAndClose(which) {
 // ── 右键菜单 ──────────────────────────────────────
 function openCtxMenu(e, file) {
   closeCtxMenu()
-  // 计算菜单位置，防止溢出屏幕
-  const menuW = 200, menuH = 420
+  // 动态估算菜单高度：基础项 + 可能的「下载」「解压」项
+  const baseH = file.is_dir ? 360 : 390
+  const extraH = isArchive(file.name) ? 36 : 0
+  const menuW = 200, menuH = baseH + extraH
   let x = e.clientX, y = e.clientY
-  if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
+  if (x + menuW > window.innerWidth)  x = window.innerWidth  - menuW - 8
   if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8
+  if (y < 8) y = 8
   ctxMenu.value = { show:true, x, y, file }
 }
 function closeCtxMenu() { ctxMenu.value = { show:false, x:0, y:0, file:null } }
@@ -1030,10 +1033,13 @@ function onTouchStart(e, file) {
   longPressTimer = setTimeout(() => {
     if (!touchMoved) {
       const touch = e.touches[0]
-      const menuW = 200, menuH = 420
+      const baseH = file.is_dir ? 360 : 390
+      const extraH = isArchive(file.name) ? 36 : 0
+      const menuW = 200, menuH = baseH + extraH
       let x = touch.clientX, y = touch.clientY
-      if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
+      if (x + menuW > window.innerWidth)  x = window.innerWidth  - menuW - 8
       if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8
+      if (y < 8) y = 8
       ctxMenu.value = { show:true, x, y, file }
     }
   }, 500)
@@ -1212,7 +1218,7 @@ function formatModeStr(mode) {
   if (!mode) return ''
   const m = mode & 0o777
   const bits = (n) => [(n&4)?'r':'-',(n&2)?'w':'-',(n&1)?'x':'-'].join('')
-  return bits((m>>6)&7)+bits((m>>3)&7)+bits(m&7)
+  return bits((m>>6)&7) + bits((m>>3)&7) + bits(m&7)
 }
 function getExt(name) {
   const ext = name.split('.').pop()?.toLowerCase()
@@ -1503,7 +1509,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .info-modal { padding: 0 !important; overflow: hidden; }
 .info-modal-header {
   display: flex; align-items: center; gap: 14px;
-  padding: 22px 24px 18px;
+  padding: 20px 24px 16px;
   border-bottom: 1px solid var(--gray-100);
   background: linear-gradient(135deg, #F8FAFF 0%, #EEF4FF 100%);
   border-radius: 20px 20px 0 0;
@@ -1511,59 +1517,54 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 }
 .info-modal-icon {
   width: 44px; height: 44px; border-radius: 11px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .info-modal-icon svg { width: 22px; height: 22px; }
-.info-modal-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.info-modal-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .info-filename { font-size: 15px; font-weight: 700; color: var(--gray-800); word-break: break-all; line-height: 1.3; }
 .info-type-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; width: fit-content; }
-.badge-dir { background: rgba(245,158,11,.12); color: #D97706; }
-.badge-file { background: rgba(59,130,246,.12); color: var(--blue-600); }
+.badge-dir  { background: rgba(245,158,11,.12); color: #D97706; }
+.badge-file { background: rgba(59,130,246,.12);  color: var(--blue-600); }
 .info-close-btn {
-  position: absolute; top: 14px; right: 14px;
   width: 28px; height: 28px; border-radius: 50%;
-  border: none; background: rgba(239,68,68,.1);
-  color: #EF4444; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .15s;
-  flex-shrink: 0;
+  border: none; background: rgba(239,68,68,.1); color: #EF4444;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background .15s; flex-shrink: 0;
 }
-.info-close-btn:hover { background: rgba(239,68,68,.2); }
+.info-close-btn:hover { background: rgba(239,68,68,.22); }
 .info-close-btn svg { width: 13px; height: 13px; }
-.info-list { padding: 8px 0 4px; }
+.info-list { padding: 6px 0 2px; }
 .info-row {
   display: flex; align-items: flex-start; gap: 12px;
-  padding: 11px 24px;
-  border-bottom: 1px solid var(--gray-50);
+  padding: 10px 24px; border-bottom: 1px solid var(--gray-50);
   transition: background .1s;
 }
 .info-row:last-child { border-bottom: none; }
 .info-row:hover { background: var(--gray-50); }
 .info-label {
-  display: flex; align-items: center; gap: 7px;
-  min-width: 90px; font-size: 12px; font-weight: 600;
-  color: var(--gray-400); padding-top: 2px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 6px;
+  min-width: 86px; font-size: 12px; font-weight: 600;
+  color: var(--gray-400); padding-top: 1px; flex-shrink: 0;
 }
-.info-label svg { width: 13px; height: 13px; flex-shrink: 0; }
+.info-label svg { width: 12px; height: 12px; flex-shrink: 0; }
 .info-value {
   font-size: 13px; color: var(--gray-700); font-weight: 500;
-  word-break: break-all; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  word-break: break-all; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
 }
-.info-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-.info-path { color: var(--blue-600); }
+.info-mono  { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.info-path  { color: var(--blue-600); }
 .info-bytes { font-size: 11px; color: var(--gray-400); font-weight: 400; }
 .info-perm-code {
-  font-family: 'JetBrains Mono', monospace; font-size: 14px;
-  font-weight: 700; color: var(--gray-700);
-  background: var(--gray-100); padding: 2px 10px; border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700;
+  color: var(--gray-700); background: var(--gray-100); padding: 2px 10px; border-radius: 6px;
 }
 .info-perm-text { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gray-500); }
 .info-vis-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
-.vis-public { background: rgba(16,185,129,.12); color: #059669; }
+.vis-public  { background: rgba(16,185,129,.12); color: #059669; }
 .vis-private { background: var(--gray-100); color: var(--gray-500); }
 
-
+/* 右键菜单 */
+.ctx-overlay { position:fixed; inset:0; z-index:300; }
 .ctx-menu { position:fixed; background:white; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.18),0 0 0 1px rgba(0,0,0,0.06); padding:5px; min-width:190px; z-index:301; animation:ctxIn .12s cubic-bezier(.4,0,.2,1); }
 @keyframes ctxIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
 .ctx-item { display:flex; align-items:center; gap:9px; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--gray-700); transition:background .1s; user-select:none; }
@@ -1889,45 +1890,9 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   .dir-tree { max-height:200px; }
   .ctx-menu { min-width:180px; }
   .ctx-item { padding:12px 16px; font-size:14px; }
-
-  /* 移动端右键菜单改为底部弹出 sheet */
-  .ctx-overlay {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    background: rgba(15,23,42,0.4);
-    backdrop-filter: blur(3px);
-  }
-  .ctx-menu {
-    position: relative !important;
-    top: auto !important;
-    left: auto !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    border-radius: 20px 20px 0 0 !important;
-    padding: 8px 0 24px !important;
-    animation: ctxSlideUp .2s cubic-bezier(.4,0,.2,1) !important;
-    box-shadow: 0 -4px 32px rgba(15,23,42,.18) !important;
-  }
-  @keyframes ctxSlideUp {
-    from { transform: translateY(100%); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
-  }
-  .ctx-menu::before {
-    content: '';
-    display: block;
-    width: 40px; height: 4px;
-    background: #CBD5E1;
-    border-radius: 2px;
-    margin: 0 auto 10px;
-  }
-  .ctx-item { padding: 14px 20px; font-size: 15px; }
-  .info-modal-header { padding: 18px 16px 14px; }
-  .info-row { padding: 11px 16px; }
-  .info-label { min-width: 78px; }
-  .ctx-item svg { width: 18px; height: 18px; }
-  .ctx-divider { margin: 6px 0; }
+  .info-modal-header { padding: 16px 16px 14px; }
+  .info-row { padding: 10px 16px; }
+  .info-label { min-width: 72px; }
 
   /* 搜索目录输入框移动端适配 */
   .search-dir-input { font-size:16px; } /* 防止 iOS 自动缩放 */
