@@ -83,7 +83,7 @@
             </div>
             <div class="info-row">
               <span class="info-label">{{ t.webdavUsername }}</span>
-              <code class="info-value">{{ auth.user?.username }}</code>
+              <code class="info-value">{{ settings.webdav_username || auth.user?.username }}</code>
             </div>
             <div class="info-row">
               <span class="info-label">{{ t.webdavPasswordLabel }}</span>
@@ -171,7 +171,7 @@ import { t } from '../i18n'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
-const settings = ref({ webdav_enabled: false, webdav_sub_path: '', webdav_password: '' })
+const settings = ref({ webdav_enabled: false, webdav_sub_path: '', webdav_username: '', webdav_password: '' })
 const files = ref([])
 const currentPath = ref('/')
 const loading = ref(false)
