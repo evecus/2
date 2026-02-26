@@ -7,6 +7,7 @@ const routes = [
   { path: '/files', component: () => import('./views/Files.vue') },
   { path: '/shared', component: () => import('./views/Shared.vue') },
   { path: '/public-files', component: () => import('./views/PublicFiles.vue') },
+  { path: '/webdav', component: () => import('./views/WebDAV.vue') },
   { path: '/pub', component: () => import('./views/PublicView.vue'), meta: { public: true } },
   { path: '/settings', redirect: '/files' },
   { path: '/s/:code', component: () => import('./views/ShareView.vue'), meta: { public: true } },
