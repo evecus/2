@@ -20,6 +20,9 @@ type Settings struct {
 	ID              uint   `gorm:"primarykey"`
 	StorageDir      string `json:"storage_dir"`
 	Lang            string `json:"lang"`
+	UITheme         string `json:"ui_theme"`
+	UIFont          string `json:"ui_font"`
+	EditorFont      string `json:"editor_font"`
 	WebDAVEnabled   bool   `json:"webdav_enabled"`
 	WebDAVSubPath   string `json:"webdav_sub_path"`
 	WebDAVUsername  string `json:"webdav_username"`
