@@ -5,7 +5,13 @@
     <div class="mesh-2"></div>
 
     <div class="auth-card">
-      <!-- Logo -->
+      <!-- Lang switch top-right -->
+      <div class="lang-switch">
+        <button :class="{ active: lang === 'zh' }" @click="setLang('zh')">中文</button>
+        <button :class="{ active: lang === 'en' }" @click="setLang('en')">EN</button>
+      </div>
+
+      <!-- Logo centered -->
       <div class="logo-area">
         <div class="logo-icon">
           <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -21,21 +27,16 @@
             <polygon points="50,24 41,42 46,42 46,60 54,60 54,42 59,42" fill="white" opacity="0.95"/>
           </svg>
         </div>
-        <div>
-          <h1 class="logo-name">CloudOne</h1>
-          <p class="logo-tag">{{ t.tagline }}</p>
-        </div>
-      </div>
-
-      <div class="lang-switch">
-        <button :class="{ active: lang === 'zh' }" @click="setLang('zh')">中文</button>
-        <button :class="{ active: lang === 'en' }" @click="setLang('en')">EN</button>
+        <h1 class="logo-name">CloudOne</h1>
+        <p class="logo-tag">{{ t.tagline }}</p>
       </div>
 
       <transition name="slide-up" mode="out-in">
         <div v-if="mode === 'setup'" key="setup">
-          <h2 class="form-title">{{ t.setup }}</h2>
-          <p class="form-desc">{{ t.setupDesc }}</p>
+          <div class="form-header">
+            <h2 class="form-title">{{ t.setup }}</h2>
+            <p class="form-desc">{{ t.setupDesc }}</p>
+          </div>
           <form @submit.prevent="doSetup">
             <div class="field">
               <label>{{ t.username }}</label>
@@ -54,8 +55,10 @@
         </div>
 
         <div v-else key="login">
-          <h2 class="form-title">{{ t.login }}</h2>
-          <p class="form-desc">{{ t.loginDesc }}</p>
+          <div class="form-header">
+            <h2 class="form-title">{{ t.login }}</h2>
+            <p class="form-desc">{{ t.loginDesc }}</p>
+          </div>
           <form @submit.prevent="doLogin">
             <div class="field">
               <label>{{ t.username }}</label>
@@ -166,7 +169,7 @@ async function doSetup() {
   backdrop-filter: blur(24px);
   border: 1px solid rgba(37,99,235,0.12);
   border-radius: 24px;
-  padding: 48px;
+  padding: 40px 48px 48px;
   width: 420px;
   box-shadow: 0 32px 80px rgba(37,99,235,0.1), 0 8px 24px rgba(0,0,0,0.06);
   position: relative;
@@ -179,30 +182,61 @@ async function doSetup() {
     width: 100%;
     min-height: 100vh;
     border-radius: 0;
-    padding: 48px 24px 32px;
+    padding: 40px 24px 32px;
     border: none;
     box-shadow: none;
     background: white;
   }
   .mesh, .mesh-2 { display: none; }
-  .logo-area { margin-bottom: 24px; }
-  .logo-icon { width: 48px; height: 48px; }
+  .logo-area { margin-bottom: 28px; }
+  .logo-icon { width: 44px; height: 44px; }
   .logo-name { font-size: 20px; }
-  .field input { padding: 14px 16px; font-size: 16px; /* 防止iOS自动缩放 */ }
+  .field input { padding: 14px 16px; font-size: 16px; }
   .btn-primary { padding: 16px; font-size: 16px; }
 }
 
+/* Lang switch — absolute top-right */
+.lang-switch {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  gap: 4px;
+}
+
+.lang-switch button {
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--gray-200);
+  background: transparent;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--gray-500);
+  transition: var(--transition);
+}
+
+.lang-switch button.active {
+  background: var(--blue-600);
+  color: white;
+  border-color: var(--blue-600);
+}
+
+/* Logo — centered column */
 .logo-area {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 6px;
   margin-bottom: 32px;
+  text-align: center;
 }
 
 .logo-icon {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   filter: drop-shadow(0 4px 12px rgba(37,99,235,0.3));
+  margin-bottom: 4px;
 }
 
 .logo-name {
@@ -217,31 +251,13 @@ async function doSetup() {
 .logo-tag {
   font-size: 13px;
   color: var(--gray-400);
-  margin-top: 4px;
+  margin-top: 0;
 }
 
-.lang-switch {
-  display: flex;
-  gap: 8px;
+/* Form header — centered */
+.form-header {
+  text-align: center;
   margin-bottom: 28px;
-}
-
-.lang-switch button {
-  padding: 6px 16px;
-  border-radius: 20px;
-  border: 1px solid var(--gray-200);
-  background: transparent;
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-  color: var(--gray-500);
-  transition: var(--transition);
-}
-
-.lang-switch button.active {
-  background: var(--blue-600);
-  color: white;
-  border-color: var(--blue-600);
 }
 
 .form-title {
@@ -254,7 +270,7 @@ async function doSetup() {
 .form-desc {
   font-size: 14px;
   color: var(--gray-400);
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 
 .field {
