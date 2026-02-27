@@ -419,7 +419,7 @@
 
       <!-- 编辑/预览文件 -->
       <div v-if="showEdit" class="modal-bg" @click.self="showEdit=false">
-        <div class="modal" :class="fileViewMode==='unsupported' ? 'modal-unsupported' : 'modal-xl'">
+        <div class="modal" :class="(fileViewMode==='unsupported' && !forceTextMode) ? 'modal-unsupported' : 'modal-xl'">
           <div class="modal-titlebar">
             <h3>
               <span v-if="fileViewMode==='image'">{{ lang==='zh'?'预览图片':'Preview' }}</span>
@@ -440,16 +440,16 @@
             <p v-if="editError" class="edit-error">{{ editError }}</p>
             <CodeEditor v-else v-model="editContent" :filename="editTarget?.name || ''" />
           </div>
-          <div class="modal-actions" :class="{ 'modal-actions-unsupported': fileViewMode==='unsupported' }">
-            <button v-if="fileViewMode==='unsupported'" class="btn-ghost btn-action-mob" @click="forceEditFile">
+          <div class="modal-actions" :class="{ 'modal-actions-unsupported': fileViewMode==='unsupported' && !forceTextMode }">
+            <button v-if="fileViewMode==='unsupported' && !forceTextMode" class="btn-ghost btn-action-mob" @click="forceEditFile">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               {{ lang==='zh'?'尝试编辑':'Try Edit' }}
             </button>
-            <button v-if="fileViewMode==='unsupported'" class="btn-ghost btn-action-mob" @click="downloadFile(editTarget);showEdit=false">
+            <button v-if="fileViewMode==='unsupported' && !forceTextMode" class="btn-ghost btn-action-mob" @click="downloadFile(editTarget);showEdit=false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               {{ t.download }}
             </button>
-            <button v-if="fileViewMode==='text'&&!editError" class="btn-primary-sm" @click="doSaveFile">{{ t.saveFile }}</button>
+            <button v-if="(fileViewMode==='text'||forceTextMode)&&!editError" class="btn-primary-sm" @click="doSaveFile">{{ t.saveFile }}</button>
           </div>
         </div>
       </div>
@@ -920,6 +920,7 @@ const editTarget = ref(null)
 const editContent = ref('')
 const editError = ref('')
 const fileViewMode = ref('text')
+const forceTextMode = ref(false) // 标记是否强制文本模式（绕过扩展名检测）
 const previewUrl = ref('')
 
 const chmodTarget = ref(null)
@@ -1270,7 +1271,7 @@ function getFileViewMode(filename) {
   return 'unsupported'
 }
 async function editFile(file) {
-  editTarget.value=file; editContent.value=''; editError.value=''; previewUrl.value=''
+  editTarget.value=file; editContent.value=''; editError.value=''; previewUrl.value=''; forceTextMode.value=false
   showEdit.value=true; const mode=getFileViewMode(file.name); fileViewMode.value=mode
   if (mode==='image') {
     const token=localStorage.getItem('token')
@@ -1285,21 +1286,14 @@ async function editFile(file) {
   catch(e) { editError.value=e.response?.data?.error||t.value.binaryFile }
 }
 // 强制以文本模式打开（用于 unsupported 文件尝试编辑）
-// 关闭当前 unsupported 弹窗，重新以 text 模式打开编辑弹窗
 async function forceEditFile() {
   if (!editTarget.value) return
-  const file = editTarget.value
-  showEdit.value = false
-  await nextTick()
-  // 强制覆盖扩展名检测，直接用 text 模式
-  editTarget.value = file
+  forceTextMode.value = true
+  fileViewMode.value = 'text'
   editContent.value = ''
   editError.value = ''
-  previewUrl.value = ''
-  fileViewMode.value = 'text'
-  showEdit.value = true
   try {
-    const { data } = await api.get('/files/content', { params: { path: file.path } })
+    const { data } = await api.get('/files/content', { params: { path: editTarget.value.path } })
     editContent.value = data.content
   } catch(e) {
     editError.value = e.response?.data?.error || (lang.value === 'zh' ? '无法读取文件内容' : 'Cannot read file content')
