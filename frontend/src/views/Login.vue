@@ -11,8 +11,8 @@
           <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="lg1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#2563EB"/>
-                <stop offset="100%" style="stop-color:#38BDF8"/>
+                <stop offset="0%" class="login-grad-1"/>
+                <stop offset="100%" class="login-grad-2"/>
               </linearGradient>
             </defs>
             <ellipse cx="50" cy="62" rx="32" ry="18" fill="url(#lg1)"/>
@@ -208,7 +208,7 @@ async function doSetup() {
 .logo-name {
   font-size: 24px;
   font-weight: 700;
-  background: linear-gradient(135deg, #2563EB, #38BDF8);
+  background: var(--primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   line-height: 1;
@@ -290,7 +290,7 @@ async function doSetup() {
 .btn-primary {
   width: 100%;
   padding: 14px;
-  background: linear-gradient(135deg, #2563EB, #0EA5E9);
+  background: var(--primary-gradient);
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -327,4 +327,8 @@ async function doSetup() {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Logo SVG 渐变跟主题色走 */
+.login-grad-1 { stop-color: var(--blue-600); }
+.login-grad-2 { stop-color: var(--sky-500); }
 </style>
