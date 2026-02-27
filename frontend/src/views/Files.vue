@@ -1608,9 +1608,9 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .modal-lg { width:520px; }
 .modal-xl { width:760px; max-height:90vh; display:flex; flex-direction:column; padding:0; background:#F8FAFC; }
 .modal-unsupported { width:440px; max-width:90vw; max-height:90vh; display:flex; flex-direction:column; padding:0; background:#F8FAFC; }
-.modal-xl .modal-titlebar, .modal-unsupported .modal-titlebar { padding:20px 24px 18px; border-bottom:2px solid var(--gray-200); margin-bottom:0; background:#F1F5F9; border-radius:20px 20px 0 0; }
+.modal-xl .modal-titlebar, .modal-unsupported .modal-titlebar { padding:14px 20px 12px; border-bottom:1.5px solid var(--gray-200); margin-bottom:0; background:#F1F5F9; border-radius:20px 20px 0 0; }
 .modal-xl .field { padding:0; margin:0; background:#F8FAFC; flex:1; display:flex; flex-direction:column; }
-.modal-xl .modal-actions, .modal-unsupported .modal-actions { padding:14px 24px; border-top:2px solid var(--gray-200); background:#F1F5F9; margin-top:0; border-radius:0 0 20px 20px; }
+.modal-xl .modal-actions, .modal-unsupported .modal-actions { padding:10px 20px; border-top:1.5px solid var(--gray-200); background:#F1F5F9; margin-top:0; border-radius:0 0 20px 20px; }
 .modal-move { width:500px; display:flex; flex-direction:column; }
 @keyframes modalIn { from{opacity:0;transform:scale(.95) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
 .modal-titlebar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
@@ -1634,7 +1634,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .field label { display:block; font-size:13px; font-weight:500; color:var(--gray-600); margin-bottom:8px; }
 .field input,.field textarea:not(.code-editor) { width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:14px; font-family:inherit; color:var(--gray-800); outline:none; resize:vertical; transition:var(--transition); box-sizing:border-box; }
 .field input:focus,.field textarea:not(.code-editor):focus { border-color:var(--blue-500); box-shadow:0 0 0 3px rgba(59,130,246,.1); }
-.edit-field-wrap { padding:16px; flex:1; display:flex; flex-direction:column; background:#F1F5F9; overflow:hidden; min-height:0; height:0; }
+.edit-field-wrap { padding:8px; flex:1; display:flex; flex-direction:column; background:#F1F5F9; overflow:hidden; min-height:0; height:0; }
 /* .code-editor 已由 CodeEditor.vue 组件接管，此处仅保留占位 */
 .upload-area { border:2px dashed var(--gray-200); border-radius:var(--radius); padding:36px; text-align:center; cursor:pointer; transition:var(--transition); margin-bottom:14px; }
 .upload-area:hover { border-color:var(--blue-400); background:var(--blue-50); }
@@ -1915,14 +1915,25 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
     max-height:92vh !important;
     border-radius:20px 20px 0 0 !important;
   }
-  /* 编辑器弹窗移动端适配 */
-  .modal-xl { max-height:100vh !important; border-radius:0 !important; }
+  /* 编辑器弹窗移动端适配：全屏填满可视区域 */
+  .modal-xl {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+  /* modal-bg 对 modal-xl 不用底部对齐，让它自己 fixed 覆盖 */
+  .modal-bg:has(.modal-xl) { align-items: stretch; }
   .modal-unsupported { max-height:80vh !important; border-radius:20px 20px 0 0 !important; }
-  .edit-field-wrap { padding:10px; }
+  .edit-field-wrap { padding:6px; }
   .modal .field input { font-size:16px; }
 
   /* 编辑弹窗标题栏：文件名截断，不换行 */
-  .modal-xl .modal-titlebar { padding:14px 16px 12px; }
+  .modal-xl .modal-titlebar { padding:10px 14px 8px; }
   .modal-xl .modal-titlebar h3 { font-size:15px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; flex:1; }
   .edit-filename { display:inline-block; max-width:55vw; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom; white-space:nowrap; }
 
@@ -1936,7 +1947,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   .modal-actions-unsupported .btn-action-mob { flex:1; justify-content:center; padding:11px 10px; font-size:14px; }
 
   /* iOS safe area 底部留白，防止 home 条遮住按钮 */
-  .modal-xl .modal-actions { padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .modal-xl .modal-actions { padding:10px 16px; padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px)); }
   .dir-tree { max-height:200px; }
   .ctx-menu { min-width:180px; }
   .ctx-item { padding:12px 16px; font-size:14px; }
