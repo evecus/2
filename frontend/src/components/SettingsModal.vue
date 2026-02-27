@@ -446,17 +446,22 @@ watch(() => props.modelValue, (v) => {
 .toggle.on .toggle-knob { transform: translateX(18px); }
 
 @media (max-width: 600px) {
+  /* 弹窗从底部弹出，宽度撑满 */
   .modal-bg { align-items: flex-end; }
-  .sm-modal {
+  .settings-modal {
     width: 100% !important;
     max-width: 100% !important;
     border-radius: 20px 20px 0 0 !important;
-    max-height: 90vh;
+    /* dvh 自动排除浏览器 UI，所有浏览器一致；vh 降级兼容 */
+    max-height: 92dvh !important;
   }
-  .sm-header { padding: 16px 18px 14px; }
-  .sm-body { padding: 16px 18px 20px; }
-  .sm-footer { padding: 8px 18px; }
-  .sm-section { padding: 14px 16px; }
-  .sm-btn { padding: 9px 16px; font-size: 13px; }
+  .sm-header { padding: 14px 16px 12px; }
+  /* iOS safe area：底部避开 home 条 */
+  .sm-body { padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .sm-section { padding: 14px 16px; gap: 10px; }
+  .sm-section-title { font-size: 13px; }
+  .sm-btn { padding: 10px 16px; font-size: 13px; }
+  /* 防止 iOS 输入框自动缩放 */
+  input, textarea { font-size: 16px !important; }
 }
 </style>
