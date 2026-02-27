@@ -419,7 +419,7 @@
 
       <!-- 编辑/预览文件 -->
       <div v-if="showEdit" class="modal-bg" @click.self="showEdit=false">
-        <div class="modal" :class="fileViewMode==='unsupported' ? 'modal-unsupported' : 'modal-xl'">
+        <div class="modal" :class="(fileViewMode==='unsupported' && !forceTextMode) ? 'modal-unsupported' : 'modal-xl'">
           <div class="modal-titlebar">
             <h3>
               <span v-if="fileViewMode==='image'">{{ lang==='zh'?'预览图片':'Preview' }}</span>
@@ -431,25 +431,25 @@
             </button>
           </div>
           <div v-if="fileViewMode==='image'" class="preview-img-wrap"><img :src="previewUrl" :alt="editTarget?.name" class="preview-img" /></div>
-          <div v-else-if="fileViewMode==='unsupported'" class="unsupported-wrap">
+          <div v-else-if="fileViewMode==='unsupported' && !forceTextMode" class="unsupported-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <p>{{ lang==='zh'?'此文件类型不支持在线预览或编辑':'This file type cannot be previewed or edited online' }}</p>
             <span class="unsupported-ext">.{{ editTarget?.name?.split('.').pop()?.toUpperCase() }}</span>
           </div>
-          <div v-else-if="fileViewMode==='text'" class="edit-field-wrap">
+          <div v-else-if="fileViewMode==='text' || forceTextMode" class="edit-field-wrap">
             <p v-if="editError" class="edit-error">{{ editError }}</p>
             <CodeEditor v-else v-model="editContent" :filename="editTarget?.name || ''" />
           </div>
-          <div class="modal-actions" :class="{ 'modal-actions-unsupported': fileViewMode==='unsupported' }">
-            <button v-if="fileViewMode==='unsupported'" class="btn-ghost btn-action-mob" @click="forceEditFile">
+          <div class="modal-actions" :class="{ 'modal-actions-unsupported': fileViewMode==='unsupported' && !forceTextMode }">
+            <button v-if="fileViewMode==='unsupported' && !forceTextMode" class="btn-ghost btn-action-mob" @click="forceEditFile">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               {{ lang==='zh'?'尝试编辑':'Try Edit' }}
             </button>
-            <button v-if="fileViewMode==='unsupported'" class="btn-ghost btn-action-mob" @click="downloadFile(editTarget);showEdit=false">
+            <button v-if="fileViewMode==='unsupported' && !forceTextMode" class="btn-ghost btn-action-mob" @click="downloadFile(editTarget);showEdit=false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               {{ t.download }}
             </button>
-            <button v-if="fileViewMode==='text'&&!editError" class="btn-primary-sm" @click="doSaveFile">{{ t.saveFile }}</button>
+            <button v-if="(fileViewMode==='text' || forceTextMode) && !editError" class="btn-primary-sm" @click="doSaveFile">{{ t.saveFile }}</button>
           </div>
         </div>
       </div>
@@ -920,6 +920,7 @@ const editTarget = ref(null)
 const editContent = ref('')
 const editError = ref('')
 const fileViewMode = ref('text')
+const forceTextMode = ref(false)
 const previewUrl = ref('')
 
 const chmodTarget = ref(null)
@@ -1270,7 +1271,7 @@ function getFileViewMode(filename) {
   return 'unsupported'
 }
 async function editFile(file) {
-  editTarget.value=file; editContent.value=''; editError.value=''; previewUrl.value=''
+  editTarget.value=file; editContent.value=''; editError.value=''; previewUrl.value=''; forceTextMode.value=false
   showEdit.value=true; const mode=getFileViewMode(file.name); fileViewMode.value=mode
   if (mode==='image') {
     const token=localStorage.getItem('token')
@@ -1287,7 +1288,7 @@ async function editFile(file) {
 // 强制以文本模式打开（用于 unsupported 文件尝试编辑）
 async function forceEditFile() {
   if (!editTarget.value) return
-  fileViewMode.value = 'text'
+  forceTextMode.value = true   // 触发弹窗切换为 modal-xl
   editContent.value = ''
   editError.value = ''
   try {
@@ -1916,25 +1917,26 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
     border-radius:20px 20px 0 0 !important;
   }
   /* 编辑器弹窗移动端适配：全屏填满可视区域 */
+  .modal-bg:has(.modal-xl) {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+  }
   .modal-xl {
-    position: fixed !important;
-    inset: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
+    height: 100% !important;
+    max-height: 100% !important;
     border-radius: 0 !important;
     margin: 0 !important;
   }
-  /* modal-bg 对 modal-xl 不用底部对齐，让它自己 fixed 覆盖 */
-  .modal-bg:has(.modal-xl) { align-items: stretch; }
   .modal-unsupported { max-height:80vh !important; border-radius:20px 20px 0 0 !important; }
   .edit-field-wrap { padding:6px; }
   .modal .field input { font-size:16px; }
 
-  /* 编辑弹窗标题栏：文件名截断，不换行 */
-  .modal-xl .modal-titlebar { padding:10px 14px 8px; }
-  .modal-xl .modal-titlebar h3 { font-size:15px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; flex:1; }
+  /* 编辑弹窗标题栏：文件名截断，不换行，极紧凑 */
+  .modal-xl .modal-titlebar { padding:8px 12px 6px; }
+  .modal-xl .modal-titlebar h3 { font-size:14px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; flex:1; }
   .edit-filename { display:inline-block; max-width:55vw; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom; white-space:nowrap; }
 
   /* unsupported 内容区移动端紧凑 */
@@ -1947,7 +1949,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   .modal-actions-unsupported .btn-action-mob { flex:1; justify-content:center; padding:11px 10px; font-size:14px; }
 
   /* iOS safe area 底部留白，防止 home 条遮住按钮 */
-  .modal-xl .modal-actions { padding:10px 16px; padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .modal-xl .modal-actions { padding:8px 14px; padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px)); }
   .dir-tree { max-height:200px; }
   .ctx-menu { min-width:180px; }
   .ctx-item { padding:12px 16px; font-size:14px; }
