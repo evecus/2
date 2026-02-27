@@ -1463,16 +1463,16 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .crumb-sep { color:var(--gray-300); font-size:14px; }
 .header-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; flex-shrink:0; }
 .header-divider { width:1px; height:22px; background:var(--gray-200); margin:0 2px; flex-shrink:0; }
-.btn-select { display:flex; align-items:center; gap:5px; padding:7px 13px; border:1.5px solid var(--blue-200); border-radius:var(--radius-sm); background:var(--blue-50); font-size:13px; font-weight:500; font-family:inherit; color:var(--blue-600); cursor:pointer; transition:var(--transition); }
+.btn-select { display:flex; align-items:center; gap:5px; padding:7px 13px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); background:white; font-size:13px; font-weight:500; font-family:inherit; color:var(--gray-600); cursor:pointer; transition:var(--transition); }
 .btn-select svg { width:14px; height:14px; }
-.btn-select:hover { background:var(--blue-100); border-color:var(--blue-400); }
+.btn-select:hover { background:var(--blue-50); border-color:var(--blue-400); color:var(--blue-600); }
 .btn-action { display:flex; align-items:center; gap:5px; padding:7px 12px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); background:white; font-size:13px; font-weight:500; font-family:inherit; color:var(--gray-600); cursor:pointer; transition:var(--transition); }
 .btn-action svg { width:15px; height:15px; }
 .btn-action:hover { border-color:var(--blue-400); color:var(--blue-600); background:var(--blue-50); }
-.btn-fetch { border-color:rgba(16,185,129,0.35); color:#059669; background:rgba(16,185,129,0.06); }
-.btn-fetch:hover { border-color:#10B981; color:#047857; background:rgba(16,185,129,0.12); }
-.btn-search { border-color:rgba(139,92,246,0.35); color:#7C3AED; background:rgba(139,92,246,0.06); }
-.btn-search:hover { border-color:#8B5CF6; color:#6D28D9; background:rgba(139,92,246,0.12); }
+.btn-fetch { }
+.btn-fetch:hover { }
+.btn-search { }
+.btn-search:hover { }
 .btn-settings { width:34px; height:34px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); background:white; display:flex; align-items:center; justify-content:center; color:var(--gray-500); cursor:pointer; transition:var(--transition); }
 .btn-settings svg { width:16px; height:16px; }
 .btn-settings:hover { border-color:var(--blue-400); color:var(--blue-600); background:var(--blue-50); }
