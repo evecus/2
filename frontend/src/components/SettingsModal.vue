@@ -179,7 +179,7 @@ const savedStorage = ref(false)
 
 // Theme
 const themes = [
-  { id: 'blue',   label: lang.value === 'zh' ? '蓝白（默认）' : 'Blue',   gradient: 'linear-gradient(135deg,#2563EB,#0EA5E9)' },
+  { id: 'blue',   label: lang.value === 'zh' ? '蓝白' : 'Blue',   gradient: 'linear-gradient(135deg,#2563EB,#0EA5E9)' },
   { id: 'rose',   label: lang.value === 'zh' ? '玫瑰粉' : 'Rose Pink',    gradient: 'linear-gradient(135deg,#E11D48,#FB7185)' },
   { id: 'forest', label: lang.value === 'zh' ? '森绿' : 'Forest Green',   gradient: 'linear-gradient(135deg,#16A34A,#4ADE80)' },
   { id: 'amber',  label: lang.value === 'zh' ? '暖橙' : 'Warm Amber',     gradient: 'linear-gradient(135deg,#D97706,#FBBF24)' },
