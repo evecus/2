@@ -1,4 +1,4 @@
-name: 删除代码
+name: 删除代码、tags和release
 
 on:
   workflow_dispatch: # 仅限手动触发，防止灾难性意外
