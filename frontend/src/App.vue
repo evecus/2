@@ -9,6 +9,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useAuthStore } from './stores/auth'
+import api from './api'
 
 const auth = useAuthStore()
 
@@ -29,18 +30,33 @@ const editorFontMap = {
   courier:   "'Courier New', monospace",
 }
 
+function applyTheme(id) {
+  document.documentElement.setAttribute('data-theme', id === 'blue' ? '' : (id || ''))
+}
+function applyFonts(uiId, editorId) {
+  document.documentElement.style.setProperty('--ui-font', uiFontMap[uiId] || uiFontMap.sora)
+  document.documentElement.style.setProperty('--editor-font', editorFontMap[editorId] || editorFontMap.jetbrains)
+}
+
 onMounted(async () => {
-  // 应用主题
-  const theme = localStorage.getItem('theme') || 'blue'
-  document.documentElement.setAttribute('data-theme', theme)
-  // 应用字体
-  const uiFont = localStorage.getItem('uiFont') || 'sora'
-  const editorFont = localStorage.getItem('editorFont') || 'jetbrains'
-  document.documentElement.style.setProperty('--ui-font', uiFontMap[uiFont] || uiFontMap.sora)
-  document.documentElement.style.setProperty('--editor-font', editorFontMap[editorFont] || editorFontMap.jetbrains)
+  // 第一步：先用 localStorage 立即渲染，避免页面闪烁
+  applyTheme(localStorage.getItem('theme') || 'blue')
+  applyFonts(localStorage.getItem('uiFont') || 'sora', localStorage.getItem('editorFont') || 'jetbrains')
 
   if (auth.token) {
     try { await auth.fetchUser() } catch {}
+    // 第二步：登录后从服务端拉最新设置，覆盖本地缓存（实现跨设备同步）
+    try {
+      const { data } = await api.get('/settings')
+      const theme = data.ui_theme || localStorage.getItem('theme') || 'blue'
+      const uiFont = data.ui_font || localStorage.getItem('uiFont') || 'sora'
+      const editorFont = data.editor_font || localStorage.getItem('editorFont') || 'jetbrains'
+      applyTheme(theme)
+      applyFonts(uiFont, editorFont)
+      localStorage.setItem('theme', theme)
+      localStorage.setItem('uiFont', uiFont)
+      localStorage.setItem('editorFont', editorFont)
+    } catch {}
   }
 })
 </script>
