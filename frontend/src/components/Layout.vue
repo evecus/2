@@ -7,8 +7,8 @@
             <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <linearGradient id="slg" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#2563EB"/>
-                  <stop offset="100%" style="stop-color:#0EA5E9"/>
+                  <stop offset="0%" class="grad-stop-1"/>
+                  <stop offset="100%" class="grad-stop-2"/>
                 </linearGradient>
               </defs>
               <ellipse cx="50" cy="62" rx="32" ry="18" fill="url(#slg)"/>
@@ -109,4 +109,8 @@ function doLogout() { auth.logout(); router.push('/login') }
   .layout { flex-direction: column; }
   .main { flex: 1; overflow: auto; }
 }
+
+/* Logo SVG 渐变跟主题色走 */
+.brand-icon :deep(.grad-stop-1) { stop-color: var(--blue-600); }
+.brand-icon :deep(.grad-stop-2) { stop-color: var(--sky-500); }
 </style>
