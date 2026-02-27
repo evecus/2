@@ -221,11 +221,11 @@ watch(() => props.filename, (name) => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  border: 1.5px solid var(--gray-200);
+  border: 1.5px solid var(--blue-100);
   border-radius: 10px;
   overflow: hidden;
   background: white;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.07);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
   transition: border-color .2s, box-shadow .2s;
   min-height: 0;
   position: relative;
@@ -233,8 +233,8 @@ watch(() => props.filename, (name) => {
   height: 100%;
 }
 .cm-editor-wrap.cm-focused {
-  border-color: var(--blue-500);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, .15);
+  border-color: var(--blue-400);
+  box-shadow: 0 0 0 2px var(--blue-100);
 }
 
 /* 语言标签 */
@@ -273,20 +273,30 @@ watch(() => props.filename, (name) => {
 }
 .cm-editor-container :deep(.cm-scroller) {
   overflow: auto !important;
-  /* 移动端触摸滚动 */
   -webkit-overflow-scrolling: touch;
+}
+/* 文字加粗，提高可读性 */
+.cm-editor-container :deep(.cm-content) {
+  font-weight: 500;
+  -webkit-font-smoothing: auto;
+  font-smooth: auto;
+}
+/* 行号不加粗 */
+.cm-editor-container :deep(.cm-gutterElement) {
+  font-weight: 400;
 }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
   .cm-editor-wrap {
-    border-radius: 8px;
+    border-radius: 6px;
   }
   .cm-editor-container :deep(.cm-editor) {
     font-size: 14px !important;
   }
   .cm-editor-container :deep(.cm-content) {
     font-size: 14px;
+    font-weight: 500;
   }
   /* 移动端行号缩窄 */
   .cm-editor-container :deep(.cm-lineNumbers .cm-gutterElement) {
