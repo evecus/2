@@ -117,7 +117,7 @@
           <div class="mob-drawer-left" @click.stop>
             <div class="mob-drawer-header">
               <div class="mob-drawer-brand">
-                <svg viewBox="0 0 100 100" style="width:28px;height:28px"><defs><linearGradient id="mdlg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#2563EB"/><stop offset="100%" style="stop-color:#38BDF8"/></linearGradient></defs><ellipse cx="50" cy="62" rx="32" ry="18" fill="url(#mdlg)"/><circle cx="36" cy="56" r="16" fill="url(#mdlg)"/><circle cx="58" cy="50" r="20" fill="url(#mdlg)"/><polygon points="50,24 41,42 46,42 46,60 54,60 54,42 59,42" fill="white" opacity="0.95"/></svg>
+                <svg viewBox="0 0 100 100" style="width:28px;height:28px" class="mob-brand-svg"><defs><linearGradient id="mdlg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" class="mob-grad-1"/><stop offset="100%" class="mob-grad-2"/></linearGradient></defs><ellipse cx="50" cy="62" rx="32" ry="18" fill="url(#mdlg)"/><circle cx="36" cy="56" r="16" fill="url(#mdlg)"/><circle cx="58" cy="50" r="20" fill="url(#mdlg)"/><polygon points="50,24 41,42 46,42 46,60 54,60 54,42 59,42" fill="white" opacity="0.95"/></svg>
                 <span>CloudOne</span>
               </div>
             </div>
@@ -1818,9 +1818,12 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   .mob-drawer-brand {
     display:flex; align-items:center; gap:10px;
   }
+  /* Logo SVG 渐变跟主题色走 */
+  .mob-grad-1 { stop-color: var(--blue-600); }
+  .mob-grad-2 { stop-color: var(--sky-500); }
   .mob-drawer-brand span {
     font-size:18px; font-weight:700;
-    background:linear-gradient(135deg,#2563EB,#38BDF8);
+    background:var(--primary-gradient);
     -webkit-background-clip:text; -webkit-text-fill-color:transparent;
   }
   .mob-drawer-nav {
