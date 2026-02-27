@@ -1,0 +1,55 @@
+name: 删所有tags和release
+
+on:
+  workflow_dispatch: # 手动触发，安全第一
+
+jobs:
+  delete-tags-and-releases:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 必须：用于删除远程 tags 和 releases
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取所有历史以识别所有 tags
+
+      # 1. 删除所有 GitHub Releases
+      - name: Delete all releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 获取所有 release 的 tag 名称（包括草稿和预发布）
+          releases=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+          
+          if [ -n "$releases" ]; then
+            echo "发现以下 Releases: $releases"
+            for tag in $releases; do
+              # --cleanup-tag 会尝试同时删除关联的远程 tag
+              gh release delete "$tag" --yes --cleanup-tag || echo "Release $tag 删除跳过（可能已被删除）"
+            done
+          else
+            echo "未发现任何 Releases。"
+          fi
+
+      # 2. 删除所有剩余的 Tags (防止有没有关联 Release 的孤立 Tag)
+      - name: Delete remaining tags
+        run: |
+          # 确保获取了所有远程 tags
+          git fetch --tags
+          tags=$(git tag)
+          
+          if [ -n "$tags" ]; then
+            echo "发现以下 Tags: $tags"
+            for tag in $tags; do
+              # 删除远程 tag
+              git push origin --delete "$tag" || true
+              echo "已删除远程 Tag: $tag"
+            done
+          else
+            echo "未发现任何 Tags。"
+          fi
+          
+      - name: Success message
+        run: echo "所有 Tags 和 Releases 已清理完毕，代码库内容保持不变。"
