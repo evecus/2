@@ -203,6 +203,9 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	var req struct {
 		StorageDir string `json:"storage_dir"`
 		Lang       string `json:"lang"`
+		UITheme    string `json:"ui_theme"`
+		UIFont     string `json:"ui_font"`
+		EditorFont string `json:"editor_font"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -218,6 +221,15 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	}
 	if req.Lang != "" {
 		s.Lang = req.Lang
+	}
+	if req.UITheme != "" {
+		s.UITheme = req.UITheme
+	}
+	if req.UIFont != "" {
+		s.UIFont = req.UIFont
+	}
+	if req.EditorFont != "" {
+		s.EditorFont = req.EditorFont
 	}
 	h.db.Save(&s)
 	h.syncConf()
