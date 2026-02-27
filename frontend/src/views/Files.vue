@@ -419,7 +419,7 @@
 
       <!-- 编辑/预览文件 -->
       <div v-if="showEdit" class="modal-bg" @click.self="showEdit=false">
-        <div class="modal" :class="(fileViewMode==='unsupported' && !forceTextMode) ? 'modal-unsupported' : 'modal-xl'">
+        <div class="modal" :class="(fileViewMode==='unsupported' && !forceTextMode) ? 'modal-unsupported' : 'modal-xl'" :key="forceTextMode ? 'editor' : fileViewMode">
           <div class="modal-titlebar">
             <h3>
               <span v-if="fileViewMode==='image'">{{ lang==='zh'?'预览图片':'Preview' }}</span>
@@ -1607,7 +1607,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.45); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:100; }
 .modal { background:white; border-radius:20px; padding:32px; width:440px; max-width:90vw; box-shadow:var(--shadow-lg); animation:modalIn .2s cubic-bezier(.4,0,.2,1); overflow:hidden; }
 .modal-lg { width:520px; }
-.modal-xl { width:760px; max-height:90vh; display:flex; flex-direction:column; padding:0; background:#F8FAFC; }
+.modal-xl { width:760px; min-height:500px; max-height:90vh; display:flex; flex-direction:column; padding:0; background:#F8FAFC; }
 .modal-unsupported { width:440px; max-width:90vw; max-height:90vh; display:flex; flex-direction:column; padding:0; background:#F8FAFC; }
 .modal-xl .modal-titlebar, .modal-unsupported .modal-titlebar { padding:14px 20px 12px; border-bottom:1.5px solid var(--gray-200); margin-bottom:0; background:#F1F5F9; border-radius:20px 20px 0 0; }
 .modal-xl .field { padding:0; margin:0; background:#F8FAFC; flex:1; display:flex; flex-direction:column; }
@@ -1635,7 +1635,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .field label { display:block; font-size:13px; font-weight:500; color:var(--gray-600); margin-bottom:8px; }
 .field input,.field textarea:not(.code-editor) { width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:14px; font-family:inherit; color:var(--gray-800); outline:none; resize:vertical; transition:var(--transition); box-sizing:border-box; }
 .field input:focus,.field textarea:not(.code-editor):focus { border-color:var(--blue-500); box-shadow:0 0 0 3px rgba(59,130,246,.1); }
-.edit-field-wrap { padding:8px; flex:1; display:flex; flex-direction:column; background:#F1F5F9; overflow:hidden; min-height:0; height:0; }
+.edit-field-wrap { padding:8px; flex:1; display:flex; flex-direction:column; background:#F1F5F9; overflow:hidden; min-height:380px; height:0; }
 /* .code-editor 已由 CodeEditor.vue 组件接管，此处仅保留占位 */
 .upload-area { border:2px dashed var(--gray-200); border-radius:var(--radius); padding:36px; text-align:center; cursor:pointer; transition:var(--transition); margin-bottom:14px; }
 .upload-area:hover { border-color:var(--blue-400); background:var(--blue-50); }
