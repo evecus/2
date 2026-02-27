@@ -247,6 +247,13 @@ async function saveWebDAV() {
   setTimeout(() => savedWebDAV.value = false, 2000)
 }
 
+function applyFont(uiId, editorId) {
+  const uiFamily = getFontFamily(uiId, 'ui')
+  const editorFamily = getFontFamily(editorId, 'editor')
+  if (uiFamily) document.documentElement.style.setProperty('--ui-font', uiFamily)
+  if (editorFamily) document.documentElement.style.setProperty('--editor-font', editorFamily)
+}
+
 async function loadData() {
   if (auth.user) {
     userForm.value.username = auth.user.username
@@ -255,6 +262,21 @@ async function loadData() {
     const { data } = await api.get('/settings')
     storageForm.value.dir = data.storage_dir
     originalStorageDir.value = data.storage_dir
+
+    // 主题：优先服务端，回退 localStorage
+    const theme = data.ui_theme || localStorage.getItem('theme') || 'blue'
+    pendingTheme.value = theme
+    document.documentElement.setAttribute('data-theme', theme === 'blue' ? '' : theme)
+    localStorage.setItem('theme', theme)
+
+    // 字体：优先服务端，回退 localStorage
+    const uiFont = data.ui_font || localStorage.getItem('uiFont') || 'sora'
+    const editorFont = data.editor_font || localStorage.getItem('editorFont') || 'jetbrains'
+    fontForm.value.ui = uiFont
+    fontForm.value.editor = editorFont
+    applyFont(uiFont, editorFont)
+    localStorage.setItem('uiFont', uiFont)
+    localStorage.setItem('editorFont', editorFont)
   } catch {}
   await loadWebDAV()
 }
@@ -281,21 +303,25 @@ async function saveStorage() {
   }, 800)
 }
 
-function saveTheme() {
+async function saveTheme() {
   const id = pendingTheme.value
+  // 立即本地生效
+  document.documentElement.setAttribute('data-theme', id === 'blue' ? '' : id)
   localStorage.setItem('theme', id)
-  document.documentElement.setAttribute('data-theme', id)
+  // 同步到服务端（所有设备同步）
+  try { await api.put('/settings', { ui_theme: id }) } catch {}
   savedTheme.value = true
   setTimeout(() => savedTheme.value = false, 2000)
 }
 
-function saveFont() {
-  localStorage.setItem('uiFont', fontForm.value.ui)
-  localStorage.setItem('editorFont', fontForm.value.editor)
-  const uiFamily = getFontFamily(fontForm.value.ui, 'ui')
-  const editorFamily = getFontFamily(fontForm.value.editor, 'editor')
-  document.documentElement.style.setProperty('--ui-font', uiFamily)
-  document.documentElement.style.setProperty('--editor-font', editorFamily)
+async function saveFont() {
+  const { ui, editor } = fontForm.value
+  // 立即本地生效
+  applyFont(ui, editor)
+  localStorage.setItem('uiFont', ui)
+  localStorage.setItem('editorFont', editor)
+  // 同步到服务端（所有设备同步）
+  try { await api.put('/settings', { ui_font: ui, editor_font: editor }) } catch {}
   savedFont.value = true
   setTimeout(() => savedFont.value = false, 2000)
 }
