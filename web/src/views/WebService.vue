@@ -161,6 +161,9 @@
           </div>
           <div class="flex justify-end gap-3 px-6 pb-6">
             <button class="btn-secondary" @click="serviceModal=null">取消</button>
+            <div v-if="svcError" class="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-xl border border-red-100 text-sm mr-auto">
+              <span>⚠️ {{ svcError }}</span>
+            </div>
             <button class="btn-primary" @click="saveService">{{ editingService ? '保存' : '创建' }}</button>
           </div>
         </div>
@@ -331,20 +334,32 @@ function openLogsFor(id) {
 // ── Service CRUD ──
 function openServiceModal(svc = null) {
   editingService.value = !!svc
+  svcError.value = ''
   svcForm.value = svc
     ? { ...svc }
     : { name: '', listen_port: 443, enable_https: true, tls_cert_id: '', enabled: true }
   serviceModal.value = true
 }
 
+const svcError = ref('')
 async function saveService() {
-  if (editingService.value) {
-    await api.put(`/webservice/${svcForm.value.id}`, svcForm.value)
-  } else {
-    await api.post('/webservice', svcForm.value)
+  svcError.value = ''
+  try {
+    if (editingService.value) {
+      await api.put(`/webservice/${svcForm.value.id}`, svcForm.value)
+    } else {
+      await api.post('/webservice', svcForm.value)
+    }
+    serviceModal.value = false
+    await load()
+  } catch (e) {
+    const port = e.response?.data?.port || svcForm.value.listen_port
+    if (e.response?.status === 409) {
+      svcError.value = `端口 ${port} 已被占用，请更换其他端口`
+    } else {
+      svcError.value = e.response?.data?.error || e.message
+    }
   }
-  serviceModal.value = false
-  await load()
 }
 
 async function toggleService(id) { await api.post(`/webservice/${id}/toggle`); await load() }
