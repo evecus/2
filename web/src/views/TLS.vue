@@ -37,8 +37,12 @@
 
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span class="font-semibold text-slate-900 font-mono">{{ cert.domain }}</span>
+              <span class="font-semibold text-slate-900">{{ cert.name || cert.domain }}</span>
               <StatusBadge :status="cert.status" />
+              <!-- domain tags -->
+              <span v-for="d in (cert.domains||[cert.domain]).slice(0,3)" :key="d"
+                    class="font-mono text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{{ d }}</span>
+              <span v-if="(cert.domains||[]).length > 3" class="text-xs text-slate-400">+{{ cert.domains.length-3 }}</span>
               <span class="badge badge-slate text-xs">{{ cert.source === 'acme' ? 'ACME' : '手动' }}</span>
               <!-- CA badge -->
               <span v-if="cert.ca_provider === 'zerossl'" class="badge text-xs" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd">ZeroSSL</span>
@@ -126,8 +130,15 @@
             </div>
 
             <div>
-              <label class="input-label">域名</label>
-              <input v-model="form.domain" class="input font-mono" placeholder="example.com 或 *.example.com" />
+              <label class="input-label">证书任务名称</label>
+              <input v-model="form.name" class="input" placeholder="例如：主站证书、泛域名证书" />
+            </div>
+
+            <div>
+              <label class="input-label">域名列表（一行一个）</label>
+              <textarea v-model="form.domainsText" class="input font-mono text-sm resize-none" rows="4"
+                        placeholder="example.com&#10;*.example.com&#10;www.example.com"></textarea>
+              <p class="text-xs text-slate-400 mt-1">支持多个域名和泛域名，将申请为同一证书的 SAN 扩展</p>
             </div>
 
             <div>
@@ -383,7 +394,7 @@ async function load() {
 
 function blankForm() {
   return {
-    domain: '', email: '', ca_provider: 'letsencrypt',
+    name: '', domainsText: '', domain: '', email: '', ca_provider: 'letsencrypt',
     provider: 'cloudflare', provider_conf: {}, auto_renew: true, source: 'acme'
   }
 }
@@ -398,7 +409,11 @@ function openModal() {
 function openEdit(cert) {
   editId.value = cert.id
   modalError.value = ''
+  const domains = cert.domains?.length ? cert.domains : (cert.domain ? [cert.domain] : [])
   form.value = {
+    name:          cert.name || '',
+    domainsText:   domains.join('
+'),
     domain:        cert.domain,
     email:         cert.email || '',
     ca_provider:   cert.ca_provider || 'letsencrypt',
@@ -418,7 +433,9 @@ function openUpload() {
 }
 
 function validateForm() {
-  if (!form.value.domain) return '请输入域名'
+  const domains = (form.value.domainsText || '').split('
+').map(s=>s.trim()).filter(Boolean)
+  if (!domains.length) return '请至少输入一个域名'
   if (!form.value.email)  return '请输入邮箱'
   if (form.value.ca_provider === 'zerossl') {
     if (!form.value.provider_conf.zerossl_key_id) return '请输入 ZeroSSL EAB Key ID'
@@ -430,12 +447,18 @@ function validateForm() {
   return null
 }
 
+function formPayload() {
+  const domains = (form.value.domainsText || '').split('
+').map(s=>s.trim()).filter(Boolean)
+  return { ...form.value, domains, domain: domains[0] || '', domainsText: undefined }
+}
+
 async function createAndIssue() {
   modalError.value = validateForm() || ''
   if (modalError.value) return
   saving.value = true
   try {
-    const { data } = await api.post('/tls', { ...form.value })
+    const { data } = await api.post('/tls', formPayload())
     modal.value = null
     await load()
     // Fire issue and poll in background
@@ -459,7 +482,7 @@ async function updateCert() {
   if (modalError.value) return
   saving.value = true
   try {
-    await api.put(`/tls/${editId.value}`, { ...form.value })
+    await api.put(`/tls/${editId.value}`, formPayload())
     modal.value = null
     // If ACME cert, re-issue after update
     if (form.value.source === 'acme') {
