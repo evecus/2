@@ -130,9 +130,18 @@ func (m *Manager) IssueCert(certID string) error {
 	}
 	user.registration = reg
 
-	// Request certificate
+	// Build domain list: use Domains slice if set, fall back to single Domain
+	domains := cert.Domains
+	if len(domains) == 0 && cert.Domain != "" {
+		domains = []string{cert.Domain}
+	}
+	if len(domains) == 0 {
+		return fmt.Errorf("no domains specified for cert %s", certID)
+	}
+
+	// Request certificate (all domains as SANs)
 	request := certificate.ObtainRequest{
-		Domains: []string{cert.Domain},
+		Domains: domains,
 		Bundle:  true,
 	}
 	certificates, err := client.Certificate.Obtain(request)
@@ -151,6 +160,10 @@ func (m *Manager) IssueCert(certID string) error {
 			m.cfg.TLSCerts[i].IssuedAt = config.Now()
 			m.cfg.TLSCerts[i].ExpiresAt = expiresAt
 			m.cfg.TLSCerts[i].Status = "active"
+			// Keep Domain in sync with first entry for display compat
+			if len(m.cfg.TLSCerts[i].Domains) > 0 {
+				m.cfg.TLSCerts[i].Domain = m.cfg.TLSCerts[i].Domains[0]
+			}
 			break
 		}
 	}
