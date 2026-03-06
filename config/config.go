@@ -182,19 +182,25 @@ type PortForwardRule struct {
 // ─── DDNS ────────────────────────────────────────────────────────────────────
 
 type DDNSRule struct {
-	ID           string       `json:"id"`
-	Name         string       `json:"name"`
-	Provider     string       `json:"provider"`
-	Domain       string       `json:"domain"`
-	SubDomain    string       `json:"sub_domain"`
-	IPVersion    string       `json:"ip_version"`
-	Interval     int          `json:"interval"`
-	Enabled      bool         `json:"enabled"`
-	ProviderConf ProviderConf `json:"provider_conf"`
-	LastIP       string       `json:"last_ip"`
-	LastUpdated  string       `json:"last_updated"`
-	IPHistory    []IPRecord   `json:"ip_history"`
-	CreatedAt    string       `json:"created_at"`
+	ID             string       `json:"id"`
+	Name           string       `json:"name"`
+	Provider       string       `json:"provider"`
+	// Domains holds one or more FQDNs to update, e.g. ["home.example.com","*.example.com"]
+	Domains        []string     `json:"domains"`
+	// Legacy single-domain fields kept for migration
+	Domain         string       `json:"domain,omitempty"`
+	SubDomain      string       `json:"sub_domain,omitempty"`
+	IPVersion      string       `json:"ip_version"`
+	// IPDetectMode: "api" (external, proxy-free) or "iface" (read local network interface)
+	IPDetectMode   string       `json:"ip_detect_mode"`
+	IPInterface    string       `json:"ip_interface"` // e.g. "eth0", only used when mode=iface
+	Interval       int          `json:"interval"`
+	Enabled        bool         `json:"enabled"`
+	ProviderConf   ProviderConf `json:"provider_conf"`
+	LastIP         string       `json:"last_ip"`
+	LastUpdated    string       `json:"last_updated"`
+	IPHistory      []IPRecord   `json:"ip_history"`
+	CreatedAt      string       `json:"created_at"`
 }
 
 type ProviderConf struct {
@@ -254,10 +260,14 @@ type WebAccessLog struct {
 
 type TLSCert struct {
 	ID           string       `json:"id"`
-	Domain       string       `json:"domain"`
-	Source       string       `json:"source"`   // acme | manual
+	Name         string       `json:"name"`     // human-readable task name
+	// Domains holds all SANs for this cert, e.g. ["example.com","*.example.com"]
+	Domains      []string     `json:"domains"`
+	// Domain kept for single-domain legacy & display
+	Domain       string       `json:"domain,omitempty"`
+	Source       string       `json:"source"`       // acme | manual
 	CAProvider   string       `json:"ca_provider"`  // letsencrypt | zerossl
-	Provider     string       `json:"provider"` // DNS provider: cloudflare | ...
+	Provider     string       `json:"provider"`     // DNS provider: cloudflare | ...
 	ProviderConf ProviderConf `json:"provider_conf"`
 	CertPEM      string       `json:"cert_pem"`
 	KeyPEM       string       `json:"key_pem"`
