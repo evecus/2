@@ -66,6 +66,7 @@ func (h *Handler) Register(r *gin.Engine) {
 
 	// DDNS
 	auth.GET("/ddns", h.listDDNS)
+	auth.GET("/ddns/interfaces", h.listInterfaces)
 	auth.POST("/ddns", h.createDDNS)
 	auth.PUT("/ddns/:id", h.updateDDNS)
 	auth.DELETE("/ddns/:id", h.deleteDDNS)
@@ -1095,4 +1096,8 @@ func (h *Handler) getCertPEM(c *gin.Context) {
 		"key_pem":  found.KeyPEM,
 		"domain":   found.Domain,
 	})
+}
+
+func (h *Handler) listInterfaces(c *gin.Context) {
+	c.JSON(200, ddns.GetInterfaces())
 }
