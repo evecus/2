@@ -203,8 +203,11 @@ func (h *Handler) logout(c *gin.Context) {
 func (h *Handler) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
+		// WebSocket clients cannot set custom headers; allow token via query param
 		if token == "" {
-			// WebSocket fallback: token in header only (not query string for security)
+			token = c.Query("token")
+		}
+		if token == "" {
 			c.JSON(401, gin.H{"error": "unauthorized"})
 			c.Abort()
 			return
