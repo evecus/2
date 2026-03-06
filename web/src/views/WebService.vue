@@ -145,8 +145,8 @@
               <label class="input-label">TLS 证书</label>
               <select v-model="svcForm.tls_cert_id" class="select">
                 <option value="">— 选择证书（可稍后配置）—</option>
-                <option v-for="cert in certs" :key="cert.id" :value="cert.id">
-                  {{ cert.domain }} · 剩余 {{ cert.days_left }} 天
+                <option v-for="cert in certs.filter(c=>c.status==='active')" :key="cert.id" :value="cert.id">
+                  {{ cert.name || cert.domain }}
                 </option>
               </select>
             </div>
