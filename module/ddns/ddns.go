@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -106,9 +107,9 @@ func (w *Worker) Run() {
 }
 
 func (w *Worker) check() {
-	ip, err := getPublicIP(w.rule.IPVersion)
+	ip, err := getPublicIP(w.rule.IPVersion, w.rule.IPDetectMode, w.rule.IPInterface)
 	if err != nil {
-		log.Printf("[ddns] %s: get IP error: %v", w.rule.Domain, err)
+		log.Printf("[ddns] rule %s: get IP error: %v", w.rule.Name, err)
 		return
 	}
 
@@ -116,24 +117,35 @@ func (w *Worker) check() {
 		return
 	}
 
-	log.Printf("[ddns] %s: IP changed %s → %s", w.rule.Domain, w.rule.LastIP, ip)
+	log.Printf("[ddns] rule %s: IP changed %s → %s", w.rule.Name, w.rule.LastIP, ip)
 
-	var updateErr error
-	switch w.rule.Provider {
-	case "cloudflare":
-		updateErr = updateCloudflare(w.rule, ip)
-	case "alidns":
-		updateErr = updateAliDNS(w.rule, ip)
-	case "dnspod", "tencentcloud":
-		updateErr = updateDNSPod(w.rule, ip)
-	default:
-		log.Printf("[ddns] unknown provider: %s", w.rule.Provider)
-		return
+	// Resolve effective domain list (support legacy single Domain+SubDomain)
+	domains := w.rule.Domains
+	if len(domains) == 0 && w.rule.Domain != "" {
+		fqdn := w.rule.Domain
+		if w.rule.SubDomain != "" && w.rule.SubDomain != "@" {
+			fqdn = w.rule.SubDomain + "." + w.rule.Domain
+		}
+		domains = []string{fqdn}
 	}
 
-	if updateErr != nil {
-		log.Printf("[ddns] %s: update error: %v", w.rule.Domain, updateErr)
-		return
+	// Update each domain
+	for _, fqdn := range domains {
+		var updateErr error
+		switch w.rule.Provider {
+		case "cloudflare":
+			updateErr = updateCloudflareRecord(w.rule, fqdn, ip)
+		case "alidns":
+			updateErr = updateAliDNSRecord(w.rule, fqdn, ip)
+		case "dnspod", "tencentcloud":
+			updateErr = updateDNSPodRecord(w.rule, fqdn, ip)
+		default:
+			log.Printf("[ddns] unknown provider: %s", w.rule.Provider)
+			return
+		}
+		if updateErr != nil {
+			log.Printf("[ddns] rule %s fqdn %s: update error: %v", w.rule.Name, fqdn, updateErr)
+		}
 	}
 
 	// Persist
@@ -157,20 +169,58 @@ func (w *Worker) check() {
 	_ = w.cfg.Save()
 }
 
-// ─── Public IP ────────────────────────────────────────────────────────────────
 
-func getPublicIP(version string) (string, error) {
-	urls := []string{"https://api4.ipify.org", "https://4.ipw.cn"}
+// ─── Public IP Detection ─────────────────────────────────────────────────────
+// ─── Public IP Detection ──────────────────────────────────────────────────────
+
+// noProxyTransport returns a Transport with proxy disabled.
+func noProxyTransport() *http.Transport {
+	return &http.Transport{
+		Proxy: nil, // explicitly bypass system proxy
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 0,
+		}).DialContext,
+		DisableKeepAlives: true,
+	}
+}
+
+// getPublicIP returns the machine's public IP.
+// mode: "api"   → query external service (proxy-free)
+//       "iface" → read IP from named network interface (iface param)
+// Falls back automatically: iface→api→error.
+func getPublicIP(version, mode, iface string) (string, error) {
+	if mode == "iface" && iface != "" {
+		ip, err := getIPFromInterface(iface, version)
+		if err == nil {
+			return ip, nil
+		}
+		log.Printf("[ddns] iface %s read failed (%v), falling back to API", iface, err)
+	}
+	return getPublicIPViaAPI(version)
+}
+
+// getPublicIPViaAPI queries external endpoints without using system proxy.
+func getPublicIPViaAPI(version string) (string, error) {
+	client := &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: noProxyTransport(),
+	}
+	urls := []string{"https://api4.ipify.org", "https://4.ipw.cn", "https://checkip.amazonaws.com"}
 	if version == "ipv6" {
 		urls = []string{"https://api6.ipify.org", "https://6.ipw.cn"}
 	}
 	for _, u := range urls {
-		resp, err := http.Get(u)
+		req, err := http.NewRequest(http.MethodGet, u, nil)
 		if err != nil {
 			continue
 		}
-		defer resp.Body.Close()
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
 		b, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			continue
 		}
@@ -182,15 +232,42 @@ func getPublicIP(version string) (string, error) {
 	return "", fmt.Errorf("all IP detection endpoints failed")
 }
 
+// getIPFromInterface reads the first suitable IP from a named network interface.
+func getIPFromInterface(ifaceName, version string) (string, error) {
+	iface, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		return "", fmt.Errorf("interface %s not found: %w", ifaceName, err)
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return "", err
+	}
+	wantV6 := version == "ipv6"
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+			continue
+		}
+		isV6 := ip.To4() == nil
+		if isV6 == wantV6 {
+			return ip.String(), nil
+		}
+	}
+	return "", fmt.Errorf("no suitable %s address on interface %s", version, ifaceName)
+}
+
+
 // ─── Cloudflare ───────────────────────────────────────────────────────────────
 
-func updateCloudflare(rule config.DDNSRule, ip string) error {
+func updateCloudflareRecord(rule config.DDNSRule, fqdn, ip string) error {
 	token := rule.ProviderConf.APIToken
 	zoneID := rule.ProviderConf.ZoneID
-	fqdn := rule.SubDomain + "." + rule.Domain
-	if rule.SubDomain == "@" || rule.SubDomain == "" {
-		fqdn = rule.Domain
-	}
 
 	// List DNS records
 	listURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records?name=%s", zoneID, fqdn)
@@ -247,7 +324,7 @@ func updateCloudflare(rule config.DDNSRule, ip string) error {
 
 // ─── AliDNS ───────────────────────────────────────────────────────────────────
 
-func updateAliDNS(rule config.DDNSRule, ip string) error {
+func updateAliDNSRecord(rule config.DDNSRule, fqdn, ip string) error {
 	// Aliyun DNS API via alidns SDK style HTTP call
 	// Simplified: use the public alidns endpoint
 	log.Printf("[ddns] AliDNS update %s → %s (stub, implement with aliyun-go-sdk)", rule.Domain, ip)
@@ -256,7 +333,24 @@ func updateAliDNS(rule config.DDNSRule, ip string) error {
 
 // ─── DNSPod / TencentCloud ────────────────────────────────────────────────────
 
-func updateDNSPod(rule config.DDNSRule, ip string) error {
+func updateDNSPodRecord(rule config.DDNSRule, fqdn, ip string) error {
 	log.Printf("[ddns] DNSPod update %s → %s (stub, implement with dnspod API)", rule.Domain, ip)
 	return nil
+}
+
+// GetInterfaces returns the names of all non-loopback network interfaces.
+// Called by the API to populate the interface selector in the UI.
+func GetInterfaces() []string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	var names []string
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		names = append(names, iface.Name)
+	}
+	return names
 }
