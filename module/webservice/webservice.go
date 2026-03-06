@@ -130,7 +130,9 @@ func (m *Manager) Start(id string) error {
 	if svc.EnableHTTPS {
 		cert, key := m.getCertPEM(svc.TLSCertID)
 		if cert == "" || key == "" {
-			return fmt.Errorf("TLS cert not found for service %s", id)
+			// No cert available yet - fall through to plain HTTP
+			log.Printf("[webservice] HTTPS requested but no cert for service %s, starting HTTP only", svc.Name)
+			goto plainHTTP
 		}
 		tlsCert, err := tls.X509KeyPair([]byte(cert), []byte(key))
 		if err != nil {
@@ -181,6 +183,7 @@ func (m *Manager) Start(id string) error {
 		return nil
 	}
 
+plainHTTP:
 	// Plain HTTP
 	httpAddr := fmt.Sprintf("0.0.0.0:%d", svc.ListenPort)
 	ms.httpSrv = &http.Server{Addr: httpAddr, Handler: router}
