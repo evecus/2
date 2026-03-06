@@ -164,6 +164,9 @@ func setupDNSProvider(client *lego.Client, cert *config.TLSCert) error {
 	case "cloudflare":
 		cfCfg := cloudflare.NewDefaultConfig()
 		cfCfg.AuthToken = cert.ProviderConf.APIToken
+		// Increase propagation timeout for slow DNS providers
+		cfCfg.PropagationTimeout = 10 * time.Minute
+		cfCfg.PollingInterval = 15 * time.Second
 		provider, err := cloudflare.NewDNSProviderConfig(cfCfg)
 		if err != nil {
 			return fmt.Errorf("cloudflare provider: %w", err)
@@ -171,8 +174,6 @@ func setupDNSProvider(client *lego.Client, cert *config.TLSCert) error {
 		return client.Challenge.SetDNS01Provider(provider,
 			dns01.AddRecursiveNameservers([]string{"1.1.1.1:53", "8.8.8.8:53"}),
 			dns01.DisableCompletePropagationRequirement(),
-			dns01.PropagationTimeout(10*time.Minute),
-			dns01.PollingInterval(15*time.Second),
 		)
 	default:
 		return fmt.Errorf("unsupported DNS provider: %s (supported: cloudflare)", cert.Provider)
