@@ -130,7 +130,7 @@ const messages = {
     confirmDelService: '确认删除此 Web 服务及所有子规则？',
     confirmDelRoute: '确认删除此子规则？',
     // ── TLS ──────────────────────────────────────────────────────────────────
-    tlsTitle: 'TLS 证书', tlsSubtitle: 'DNS-01 自动申请证书，支持 Let's Encrypt 和 ZeroSSL，手动上传，自动续期',
+    tlsSubtitle: `DNS-01 自动申请证书，支持 Let's Encrypt 和 ZeroSSL，手动上传，自动续期`,
     uploadCert: '上传证书', applyCert: '申请证书',
     noTlsCerts: '暂无 TLS 证书', noTlsCertsHint: '点击右上角申请或上传证书',
     manual: '手动', autoRenew: '自动续期',
