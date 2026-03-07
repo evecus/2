@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -107,7 +108,7 @@ func (w *Worker) Run() {
 }
 
 func (w *Worker) check() {
-	ip, err := getPublicIP(w.rule.IPVersion, w.rule.IPDetectMode, w.rule.IPInterface)
+	ip, err := getPublicIP(w.rule.IPVersion, w.rule.IPDetectMode, w.rule.IPInterface, w.rule.IPIndex)
 	if err != nil {
 		log.Printf("[ddns] rule %s: get IP error: %v", w.rule.Name, err)
 		return
@@ -189,9 +190,9 @@ func noProxyTransport() *http.Transport {
 // mode: "api"   → query external service (proxy-free)
 //       "iface" → read IP from named network interface (iface param)
 // Falls back automatically: iface→api→error.
-func getPublicIP(version, mode, iface string) (string, error) {
+func getPublicIP(version, mode, iface string, ipIndex int) (string, error) {
 	if mode == "iface" && iface != "" {
-		ip, err := getIPFromInterface(iface, version)
+		ip, err := getIPFromInterface(iface, version, ipIndex)
 		if err == nil {
 			return ip, nil
 		}
@@ -201,14 +202,31 @@ func getPublicIP(version, mode, iface string) (string, error) {
 }
 
 // getPublicIPViaAPI queries external endpoints without using system proxy.
+// URL lists are tuned for reliability in Chinese networks.
 func getPublicIPViaAPI(version string) (string, error) {
 	client := &http.Client{
 		Timeout:   10 * time.Second,
 		Transport: noProxyTransport(),
 	}
-	urls := []string{"https://api4.ipify.org", "https://4.ipw.cn", "https://checkip.amazonaws.com"}
+	// IPv4 endpoints
+	ipv4URLs := []string{
+		"https://ddns.oray.com/checkip",
+		"http://v4.66666.host:66/ip",
+		"https://myip.ipip.net",
+		"http://v4.666666.host:66/ip",
+		"https://4.ipw.cn",
+		"https://ip.3322.net",
+	}
+	// IPv6 endpoints
+	ipv6URLs := []string{
+		"http://v6.66666.host:66/ip",
+		"http://myip6.ipip.net",
+		"https://6.ipw.cn",
+		"http://v6.666666.host:66/ip",
+	}
+	urls := ipv4URLs
 	if version == "ipv6" {
-		urls = []string{"https://api6.ipify.org", "https://6.ipw.cn"}
+		urls = ipv6URLs
 	}
 	for _, u := range urls {
 		req, err := http.NewRequest(http.MethodGet, u, nil)
@@ -224,7 +242,8 @@ func getPublicIPViaAPI(version string) (string, error) {
 		if err != nil {
 			continue
 		}
-		ip := strings.TrimSpace(string(b))
+		// Some endpoints return JSON like {"ip":"1.2.3.4"}, extract IP robustly
+		ip := extractIP(strings.TrimSpace(string(b)))
 		if ip != "" {
 			return ip, nil
 		}
@@ -232,8 +251,24 @@ func getPublicIPViaAPI(version string) (string, error) {
 	return "", fmt.Errorf("all IP detection endpoints failed")
 }
 
-// getIPFromInterface reads the first suitable IP from a named network interface.
-func getIPFromInterface(ifaceName, version string) (string, error) {
+// extractIP picks the first IP-like token from a response body.
+// Handles plain "1.2.3.4", "Current IP Address: 1.2.3.4", or JSON substrings.
+func extractIP(body string) string {
+	// Try splitting on common separators and find first token that looks like an IP
+	for _, token := range strings.FieldsFunc(body, func(r rune) bool {
+		return r == ' ' || r == ':' || r == '\t' || r == '\n' || r == '\r' || r == '"' || r == '{'|| r == '}'
+	}) {
+		token = strings.TrimSpace(token)
+		if net.ParseIP(token) != nil {
+			return token
+		}
+	}
+	return ""
+}
+
+// getIPFromInterface reads a suitable IP from a named network interface.
+// ipIndex: for IPv6, selects the Nth global unicast address (0 = first).
+func getIPFromInterface(ifaceName, version string, ipIndex int) (string, error) {
 	iface, err := net.InterfaceByName(ifaceName)
 	if err != nil {
 		return "", fmt.Errorf("interface %s not found: %w", ifaceName, err)
@@ -243,6 +278,50 @@ func getIPFromInterface(ifaceName, version string) (string, error) {
 		return "", err
 	}
 	wantV6 := version == "ipv6"
+	var candidates []string
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsPrivate() && !wantV6 {
+			continue
+		}
+		isV6 := ip.To4() == nil
+		if isV6 != wantV6 {
+			continue
+		}
+		// For IPv6 skip private/ULA (fc00::/7) — keep only global unicast
+		if wantV6 && (ip[0]&0xfe) == 0xfc {
+			continue
+		}
+		candidates = append(candidates, ip.String())
+	}
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("no suitable %s address on interface %s", version, ifaceName)
+	}
+	if ipIndex < 0 || ipIndex >= len(candidates) {
+		ipIndex = 0
+	}
+	return candidates[ipIndex], nil
+}
+
+// ListInterfaceIPs returns all suitable IPs on an interface for the given version.
+// Used by the API to let the user preview which addresses are available.
+func ListInterfaceIPs(ifaceName, version string) ([]string, error) {
+	iface, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
+	wantV6 := version == "ipv6"
+	var result []string
 	for _, addr := range addrs {
 		var ip net.IP
 		switch v := addr.(type) {
@@ -255,32 +334,113 @@ func getIPFromInterface(ifaceName, version string) (string, error) {
 			continue
 		}
 		isV6 := ip.To4() == nil
-		if isV6 == wantV6 {
-			return ip.String(), nil
+		if isV6 != wantV6 {
+			continue
 		}
+		if wantV6 && (ip[0]&0xfe) == 0xfc {
+			continue // skip ULA
+		}
+		result = append(result, ip.String())
 	}
-	return "", fmt.Errorf("no suitable %s address on interface %s", version, ifaceName)
+	return result, nil
 }
 
 
 // ─── Cloudflare ───────────────────────────────────────────────────────────────
 
-func updateCloudflareRecord(rule config.DDNSRule, fqdn, ip string) error {
-	token := rule.ProviderConf.APIToken
-	zoneID := rule.ProviderConf.ZoneID
-
-	// List DNS records
-	listURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records?name=%s", zoneID, fqdn)
-	req, _ := http.NewRequest("GET", listURL, nil)
+// cfDo is a small helper that executes a Cloudflare API request and checks success.
+func cfDo(client *http.Client, method, url, token, body string) error {
+	var bodyReader *strings.Reader
+	if body != "" {
+		bodyReader = strings.NewReader(body)
+	} else {
+		bodyReader = strings.NewReader("")
+	}
+	req, err := http.NewRequest(method, url, bodyReader)
+	if err != nil {
+		return err
+	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	var r struct {
+		Success bool            `json:"success"`
+		Errors  []struct{ Message string } `json:"errors"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return err
+	}
+	if !r.Success && len(r.Errors) > 0 {
+		return fmt.Errorf("cloudflare API error: %s", r.Errors[0].Message)
+	}
+	return nil
+}
 
+// cfResolveZoneID returns the provided zoneID if non-empty, otherwise
+// queries the Cloudflare API to find the Zone ID for the root domain of fqdn.
+func cfResolveZoneID(client *http.Client, token, zoneID, fqdn string) (string, error) {
+	if zoneID != "" {
+		return zoneID, nil
+	}
+	// Extract root domain (last two labels) from fqdn for zone lookup
+	parts := strings.Split(fqdn, ".")
+	rootDomain := fqdn
+	if len(parts) >= 2 {
+		rootDomain = strings.Join(parts[len(parts)-2:], ".")
+	}
+	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones?name=%s", rootDomain)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var r struct {
+		Result []struct {
+			ID string `json:"id"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return "", err
+	}
+	if len(r.Result) == 0 {
+		return "", fmt.Errorf("cloudflare: no zone found for domain %s", rootDomain)
+	}
+	return r.Result[0].ID, nil
+}
+
+func updateCloudflareRecord(rule config.DDNSRule, fqdn, ip string) error {
+	token := rule.ProviderConf.APIToken
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// Zone ID is optional — auto-resolve from domain if blank
+	zoneID, err := cfResolveZoneID(client, token, rule.ProviderConf.ZoneID, fqdn)
+	if err != nil {
+		return fmt.Errorf("zone ID lookup failed: %w", err)
+	}
+
+	recType := "A"
+	if rule.IPVersion == "ipv6" {
+		recType = "AAAA"
+	}
+
+	// Find existing DNS record
+	listURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records?type=%s&name=%s", zoneID, recType, fqdn)
+	req, _ := http.NewRequest("GET", listURL, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 	var listResp struct {
 		Result []struct {
 			ID string `json:"id"`
@@ -290,36 +450,15 @@ func updateCloudflareRecord(rule config.DDNSRule, fqdn, ip string) error {
 		return err
 	}
 
-	recType := "A"
-	if rule.IPVersion == "ipv6" {
-		recType = "AAAA"
-	}
-
-	body := fmt.Sprintf(`{"type":"%s","name":"%s","content":"%s","ttl":60,"proxied":false}`, recType, fqdn, ip)
+	body := fmt.Sprintf(`{"type":%q,"name":%q,"content":%q,"ttl":60,"proxied":false}`, recType, fqdn, ip)
 
 	if len(listResp.Result) > 0 {
 		recordID := listResp.Result[0].ID
 		putURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s", zoneID, recordID)
-		req2, _ := http.NewRequest("PUT", putURL, strings.NewReader(body))
-		req2.Header.Set("Authorization", "Bearer "+token)
-		req2.Header.Set("Content-Type", "application/json")
-		resp2, err := client.Do(req2)
-		if err != nil {
-			return err
-		}
-		resp2.Body.Close()
-	} else {
-		postURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records", zoneID)
-		req2, _ := http.NewRequest("POST", postURL, strings.NewReader(body))
-		req2.Header.Set("Authorization", "Bearer "+token)
-		req2.Header.Set("Content-Type", "application/json")
-		resp2, err := client.Do(req2)
-		if err != nil {
-			return err
-		}
-		resp2.Body.Close()
+		return cfDo(client, "PUT", putURL, token, body)
 	}
-	return nil
+	postURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records", zoneID)
+	return cfDo(client, "POST", postURL, token, body)
 }
 
 // ─── AliDNS ───────────────────────────────────────────────────────────────────
@@ -338,8 +477,17 @@ func updateDNSPodRecord(rule config.DDNSRule, fqdn, ip string) error {
 	return nil
 }
 
-// GetInterfaces returns the names of all non-loopback network interfaces.
-// Called by the API to populate the interface selector in the UI.
+// GetInterfaces returns only physical network interface names.
+//
+// Detection strategy (Linux):
+//   /sys/class/net/<iface>/device  exists  → backed by a real hardware device (PCI/USB/etc.)
+//   /sys/class/net/<iface>/wireless exists → Wi-Fi physical interface
+//
+// Both are physical; everything else (veth, bridge, tun, sit, docker…) lacks the
+// "device" symlink and is therefore considered virtual.
+//
+// On non-Linux platforms we fall back to the name-prefix heuristic so the code
+// still compiles and runs (e.g. macOS in development).
 func GetInterfaces() []string {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -350,7 +498,39 @@ func GetInterfaces() []string {
 		if iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
+		if !isPhysicalInterface(iface.Name) {
+			continue
+		}
 		names = append(names, iface.Name)
 	}
 	return names
+}
+
+// isPhysicalInterface returns true when the named interface corresponds to a
+// real hardware NIC. On Linux this is determined by the presence of the
+// /sys/class/net/<name>/device sysfs entry, which the kernel only creates for
+// interfaces that are bound to an actual hardware device.
+func isPhysicalInterface(name string) bool {
+	// Primary check: sysfs device symlink (Linux only)
+	devicePath := "/sys/class/net/" + name + "/device"
+	if _, err := os.Stat(devicePath); err == nil {
+		return true // has a hardware device → physical
+	}
+	// Wireless interfaces always have a "wireless" directory under sysfs
+	wirelessPath := "/sys/class/net/" + name + "/wireless"
+	if _, err := os.Stat(wirelessPath); err == nil {
+		return true
+	}
+	// Fallback for non-Linux (development): exclude obvious virtual prefixes
+	virtualPrefixes := []string{
+		"veth", "docker", "br-", "virbr", "vmnet", "vboxnet",
+		"tun", "tap", "sit", "ip6tnl", "gre", "dummy", "lo",
+	}
+	for _, prefix := range virtualPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return false
+		}
+	}
+	// On non-Linux, if it passed the prefix check assume physical
+	return true
 }
