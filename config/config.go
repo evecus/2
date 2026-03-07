@@ -278,6 +278,7 @@ type TLSCert struct {
 	AutoRenew    bool         `json:"auto_renew"`
 	Email        string       `json:"email"`
 	Status       string       `json:"status"`
+	ErrorMsg     string       `json:"error_msg,omitempty"` // last issuance error, cleared on success
 	CreatedAt    string       `json:"created_at"`
 }
 
