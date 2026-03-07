@@ -123,7 +123,7 @@
             <!-- IP 获取方式 -->
             <div>
               <label class="input-label">获取公网 IP 方式</label>
-              <select v-model="form.ip_detect_mode" class="select">
+              <select v-model="form.ip_detect_mode" class="select" @change="onDetectModeChange">
                 <option value="api">通过外部 API 获取（自动绕过代理）</option>
                 <option value="iface">通过网卡获取</option>
               </select>
@@ -139,7 +139,7 @@
                   </select>
                   <input v-else v-model="form.ip_interface" class="input flex-1 font-mono" placeholder="eth0" @blur="onIfaceChange" />
                   <button type="button" class="btn-secondary btn-sm whitespace-nowrap" @click="loadInterfaces">
-                    <RefreshCw :size="13" />
+                    <RefreshCw :size="13" :class="ifaceLoading ? 'animate-spin' : ''" />
                   </button>
                 </div>
               </div>
@@ -301,6 +301,8 @@ async function loadInterfaces() {
     if (interfaces.value.length && !form.value.ip_interface) {
       form.value.ip_interface = interfaces.value[0]
     }
+    // Always trigger IP load after interface list is ready
+    onIfaceChange()
   } catch {}
 }
 
@@ -329,6 +331,26 @@ function onIfaceChange() {
   if (form.value.ip_detect_mode === 'iface' && form.value.ip_version === 'ipv6' && form.value.ip_interface) {
     loadIfaceIPs(form.value.ip_interface, 'ipv6')
   }
+}
+
+// Called when user switches to "通过网卡获取":
+// load physical interfaces and immediately detect IPs on the first one
+async function onDetectModeChange() {
+  if (form.value.ip_detect_mode !== 'iface') return
+  ifaceIPs.value = []
+  ifaceLoadError.value = ''
+  try {
+    const { data } = await api.get('/ddns/interfaces')
+    interfaces.value = data || []
+    if (interfaces.value.length) {
+      // Auto-select first physical interface
+      form.value.ip_interface = interfaces.value[0]
+      // Auto-load IPv6 addresses if in IPv6 mode
+      if (form.value.ip_version === 'ipv6') {
+        loadIfaceIPs(form.value.ip_interface, 'ipv6')
+      }
+    }
+  } catch {}
 }
 
 
