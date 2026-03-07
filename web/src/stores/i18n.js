@@ -302,7 +302,7 @@ const messages = {
     confirmDelService: 'Delete this web service and all its routes?',
     confirmDelRoute: 'Delete this route?',
     // ── TLS ──────────────────────────────────────────────────────────────────
-    tlsTitle: 'TLS Certificates', tlsSubtitle: 'DNS-01 ACME certificates via Let's Encrypt or ZeroSSL. Manual upload & auto-renewal.',
+    tlsTitle: 'TLS Certificates', tlsSubtitle: "DNS-01 ACME certificates via Let's Encrypt or ZeroSSL. Manual upload & auto-renewal.",
     uploadCert: 'Upload Cert', applyCert: 'Request Cert',
     noTlsCerts: 'No TLS certificates', noTlsCertsHint: 'Request or upload a certificate above',
     manual: 'Manual', autoRenew: 'Auto-renew',
