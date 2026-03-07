@@ -2,15 +2,15 @@
   <div class="space-y-6 animate-fade-in">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Web 服务</h1>
-        <p class="page-subtitle">反向代理，HTTP 自动重定向 HTTPS，支持多域名子规则</p>
+        <h1 class="page-title">{{ t('wsTitle') }}</h1>
+        <p class="page-subtitle">{{ t('wsSubtitle') }}</p>
       </div>
       <div class="flex gap-2">
         <button class="btn-secondary" @click="logsModal=true">
-          <ScrollText :size="15" /> 访问日志
+          <ScrollText :size="15" /> {{ t('accessLogs') }}
         </button>
         <button class="btn-primary" @click="openServiceModal()">
-          <Plus :size="16" /> 添加服务
+          <Plus :size="16" /> {{ t('addService') }}
         </button>
       </div>
     </div>
@@ -20,8 +20,8 @@
       <div class="w-16 h-16 rounded-3xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
         <Server :size="28" class="text-purple-400" />
       </div>
-      <p class="text-slate-500 font-medium">暂无 Web 服务</p>
-      <p class="text-slate-400 text-sm mt-1">点击「添加服务」绑定一个监听端口</p>
+      <p class="text-slate-500 font-medium">{{ t('noServices') }}</p>
+      <p class="text-slate-400 text-sm mt-1">{{ t('noServicesHint') }}</p>
     </div>
 
     <!-- Service cards -->
@@ -34,19 +34,19 @@
         </div>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-semibold text-slate-900">{{ svc.name || '未命名服务' }}</span>
+            <span class="font-semibold text-slate-900">{{ svc.name || t('unnamedService') }}</span>
             <span class="status-dot" :class="svc.enabled ? 'active' : 'inactive'"></span>
             <span v-if="svc.enable_https" class="badge badge-green">HTTPS</span>
             <span v-else class="badge badge-slate">HTTP only</span>
-            <span class="badge badge-purple">端口 {{ svc.listen_port }}</span>
+            <span class="badge badge-purple">{{ t('port', {port: svc.listen_port}) }}</span>
           </div>
           <div class="text-xs text-slate-400 mt-0.5">
-            {{ (svc.routes||[]).length }} 条子规则 ·
-            {{ svc.enable_https ? 'HTTP 自动重定向至 HTTPS' : '仅 HTTP' }}
+            {{ t('routeCount', {n: (svc.routes||[]).length}) }} ·
+            {{ svc.enable_https ? t('httpRedirect') : t('httpOnly') }}
           </div>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
-          <button @click="openLogsFor(svc.id)" class="btn-ghost btn-sm text-slate-500" title="访问日志">
+          <button @click="openLogsFor(svc.id)" class="btn-ghost btn-sm text-slate-500" :title="t('accessLogs')">
             <ScrollText :size="14" />
           </button>
           <label class="toggle">
@@ -66,14 +66,14 @@
       <!-- Sub-routes table -->
       <div class="p-4">
         <div class="flex items-center justify-between mb-3">
-          <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">子规则 (域名 → 后端)</span>
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ t('subRoutes') }}</span>
           <button @click="openRouteModal(svc.id)" class="btn-ghost btn-sm text-purple-600 hover:bg-purple-50">
-            <Plus :size="12" /> 添加子规则
+            <Plus :size="12" /> {{ t('addSubRoute') }}
           </button>
         </div>
 
         <div v-if="!(svc.routes&&svc.routes.length)" class="text-center py-6 text-slate-300 text-sm border border-dashed border-slate-200 rounded-xl">
-          暂无子规则，添加域名 → 后端映射
+          {{ t('noSubRoutes') }}
         </div>
         <div v-else class="space-y-2">
           <div v-for="route in svc.routes" :key="route.id"
@@ -115,19 +115,19 @@
       <div v-if="serviceModal" class="modal-overlay" @click.self="serviceModal=null">
         <div class="modal-box">
           <div class="flex items-center justify-between p-6 border-b border-slate-100">
-            <h3 class="font-semibold text-slate-900">{{ editingService ? '编辑 Web 服务' : '添加 Web 服务' }}</h3>
+            <h3 class="font-semibold text-slate-900">{{ editingService ? t('editService') : t('addWebService') }}</h3>
             <button @click="serviceModal=null" class="btn-ghost btn-sm"><X :size="16" /></button>
           </div>
           <div class="p-6 space-y-4">
             <div>
-              <label class="input-label">服务名称</label>
+              <label class="input-label">{{ t('serviceName') }}</label>
               <input v-model="svcForm.name" class="input" placeholder="My Web App" />
             </div>
             <div>
-              <label class="input-label">监听端口</label>
+              <label class="input-label">{{ t('listenPortLabel') }}</label>
               <input v-model.number="svcForm.listen_port" type="number" class="input max-w-xs" placeholder="443" />
               <p class="text-xs text-slate-400 mt-1">
-                浏览器通过此端口访问，例如 443 则访问 https://a.com，6644 则访问 https://a.com:6644
+                {{ t('listenPortHint') }}
               </p>
             </div>
             <div class="flex items-center gap-3 py-1">
@@ -137,14 +137,14 @@
                 <div class="toggle-thumb"></div>
               </label>
               <div>
-                <div class="text-sm font-medium text-slate-700">启用 HTTPS</div>
-                <div class="text-xs text-slate-400">HTTP 访问自动 301 跳转至 HTTPS</div>
+                <div class="text-sm font-medium text-slate-700">{{ t('enableHttps') }}</div>
+                <div class="text-xs text-slate-400">{{ t('httpsHint') }}</div>
               </div>
             </div>
             <div v-if="svcForm.enable_https">
-              <label class="input-label">TLS 证书</label>
+              <label class="input-label">{{ t('tlsCert') }}</label>
               <select v-model="svcForm.tls_cert_id" class="select">
-                <option value="">— 选择证书（可稍后配置）—</option>
+                <option value="">{{ t('selectCert') }}</option>
                 <option v-for="cert in certs.filter(c=>c.status==='active')" :key="cert.id" :value="cert.id">
                   {{ cert.name || cert.domain }}
                 </option>
@@ -156,15 +156,15 @@
                 <div class="toggle-track"></div>
                 <div class="toggle-thumb"></div>
               </label>
-              <span class="text-sm text-slate-600">创建后立即启用</span>
+              <span class="text-sm text-slate-600">{{ t('enableNow') }}</span>
             </div>
           </div>
           <div class="flex justify-end gap-3 px-6 pb-6">
-            <button class="btn-secondary" @click="serviceModal=null">取消</button>
+            <button class="btn-secondary" @click="serviceModal=null">{{ t('cancel') }}</button>
             <div v-if="svcError" class="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-xl border border-red-100 text-sm mr-auto">
               <span>⚠️ {{ svcError }}</span>
             </div>
-            <button class="btn-primary" @click="saveService">{{ editingService ? '保存' : '创建' }}</button>
+            <button class="btn-primary" @click="saveService">{{ editingService ? t('save') : t('create') }}</button>
           </div>
         </div>
       </div>
@@ -176,25 +176,25 @@
         <div class="modal-box">
           <div class="flex items-center justify-between p-6 border-b border-slate-100">
             <div>
-              <h3 class="font-semibold text-slate-900">{{ editingRoute ? '编辑子规则' : '添加子规则' }}</h3>
-              <p class="text-xs text-slate-400 mt-0.5">域名 → 后端地址映射</p>
+              <h3 class="font-semibold text-slate-900">{{ editingRoute ? t('editSubRoute') : t('addSubRouteTitle') }}</h3>
+              <p class="text-xs text-slate-400 mt-0.5">{{ t('routeDesc') }}</p>
             </div>
             <button @click="routeModal=null" class="btn-ghost btn-sm"><X :size="16" /></button>
           </div>
           <div class="p-6 space-y-4">
             <div class="p-4 bg-purple-50 rounded-xl border border-purple-100 text-xs text-purple-700 space-y-1">
-              <p><strong>前端域名</strong>：浏览器输入的域名，Vane 根据 Host 头匹配</p>
-              <p><strong>后端地址</strong>：内网实际服务地址，如 http://127.0.0.1:3000</p>
+              <p v-html="t('routeHelp1')"></p>
+              <p v-html="t('routeHelp2')"></p>
             </div>
             <div>
-              <label class="input-label">前端域名</label>
+              <label class="input-label">{{ t('frontDomain') }}</label>
               <input v-model="routeForm.domain" class="input font-mono" placeholder="a.com" />
               <p class="text-xs text-slate-400 mt-1">
-                浏览器访问 {{ currentSvc?.enable_https ? 'https' : 'http' }}://{{ routeForm.domain || 'a.com' }}{{ currentSvc && currentSvc.listen_port !== 443 ? ':'+currentSvc.listen_port : '' }}
+                {{ currentSvc?.enable_https ? 'https' : 'http' }}://{{ routeForm.domain || 'a.com' }}{{ currentSvc && currentSvc.listen_port !== 443 ? ':'+currentSvc.listen_port : '' }}
               </p>
             </div>
             <div>
-              <label class="input-label">后端地址</label>
+              <label class="input-label">{{ t('backendAddr') }}</label>
               <input v-model="routeForm.backend_url" class="input font-mono text-sm" placeholder="http://127.0.0.1:8080" />
             </div>
             <div class="flex items-center gap-3">
@@ -203,12 +203,12 @@
                 <div class="toggle-track"></div>
                 <div class="toggle-thumb"></div>
               </label>
-              <span class="text-sm text-slate-600">启用此子规则</span>
+              <span class="text-sm text-slate-600">{{ t('enableRoute') }}</span>
             </div>
           </div>
           <div class="flex justify-end gap-3 px-6 pb-6">
-            <button class="btn-secondary" @click="routeModal=null">取消</button>
-            <button class="btn-primary" @click="saveRoute">{{ editingRoute ? '保存' : '添加' }}</button>
+            <button class="btn-secondary" @click="routeModal=null">{{ t('cancel') }}</button>
+            <button class="btn-primary" @click="saveRoute">{{ editingRoute ? t('saveRouteBtn') : t('addRouteBtn') }}</button>
           </div>
         </div>
       </div>
@@ -220,31 +220,31 @@
         <div class="modal-box max-w-4xl w-full">
           <div class="flex items-center justify-between p-6 border-b border-slate-100">
             <div>
-              <h3 class="font-semibold text-slate-900">访问日志</h3>
-              <p class="text-xs text-slate-400 mt-0.5">最近 {{ logs.length }} 条记录（内存保存 2000 条）</p>
+              <h3 class="font-semibold text-slate-900">{{ t('logsTitle') }}</h3>
+              <p class="text-xs text-slate-400 mt-0.5">{{ t('logsCount', {n: logs.length}) }}</p>
             </div>
             <button @click="logsModal=false; logsServiceID=''" class="btn-ghost btn-sm"><X :size="16" /></button>
           </div>
 
           <!-- Log filter bar -->
           <div class="px-6 py-3 border-b border-slate-50 flex items-center gap-3">
-            <input v-model="logSearch" class="input max-w-xs text-xs py-1.5" placeholder="搜索 IP / 域名 / UA..." />
+            <input v-model="logSearch" class="input max-w-xs text-xs py-1.5" :placeholder="t('logsSearch')" />
             <button @click="loadLogs" class="btn-secondary btn-sm">
-              <RefreshCw :size="12" /> 刷新
+              <RefreshCw :size="12" /> {{ t('refresh') }}
             </button>
-            <span class="text-xs text-slate-400 ml-auto">{{ filteredLogs.length }} 条</span>
+            <span class="text-xs text-slate-400 ml-auto">{{ t('logsTotal', {n: filteredLogs.length}) }}</span>
           </div>
 
           <div class="overflow-auto max-h-[60vh]">
             <table class="w-full text-xs">
               <thead class="bg-slate-50 sticky top-0">
                 <tr>
-                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">时间</th>
-                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">域名</th>
-                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">路径</th>
-                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">状态</th>
-                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">耗时</th>
-                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">来源 IP</th>
+                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">{{ t('logsTime') }}</th>
+                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">{{ t('logsDomain') }}</th>
+                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">{{ t('logsPath') }}</th>
+                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">{{ t('logsStatus') }}</th>
+                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">{{ t('logsDuration') }}</th>
+                  <th class="text-left px-4 py-2.5 font-semibold text-slate-500">{{ t('logsSrcIp') }}</th>
                   <th class="text-left px-4 py-2.5 font-semibold text-slate-500 max-w-[180px]">User-Agent</th>
                 </tr>
               </thead>
@@ -268,7 +268,7 @@
                   </td>
                 </tr>
                 <tr v-if="filteredLogs.length === 0">
-                  <td colspan="7" class="text-center py-12 text-slate-300">暂无访问记录</td>
+                  <td colspan="7" class="text-center py-12 text-slate-300">{{ t('noLogs') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -283,6 +283,9 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { Plus, Server, ArrowRight, Pencil, Trash2, X, ScrollText, RefreshCw } from 'lucide-vue-next'
 import { api } from '@/stores/auth'
+import { useI18n } from '@/stores/i18n'
+
+const { t } = useI18n()
 
 const services = ref([])
 const certs = ref([])
@@ -355,7 +358,7 @@ async function saveService() {
   } catch (e) {
     const port = e.response?.data?.port || svcForm.value.listen_port
     if (e.response?.status === 409) {
-      svcError.value = `端口 ${port} 已被占用，请更换其他端口`
+      svcError.value = t('portOccupied', {port})
     } else {
       svcError.value = e.response?.data?.error || e.message
     }
@@ -364,7 +367,7 @@ async function saveService() {
 
 async function toggleService(id) { await api.post(`/webservice/${id}/toggle`); await load() }
 async function delService(id) {
-  if (!confirm('确认删除此 Web 服务及其所有子规则？')) return
+  if (!confirm(t('confirmDelService'))) return
   await api.delete(`/webservice/${id}`)
   await load()
 }
@@ -396,7 +399,7 @@ async function toggleRoute(svcID, rid) {
 }
 
 async function delRoute(svcID, rid) {
-  if (!confirm('确认删除此子规则？')) return
+  if (!confirm(t('confirmDelRoute'))) return
   await api.delete(`/webservice/${svcID}/routes/${rid}`)
   await load()
 }
