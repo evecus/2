@@ -193,7 +193,9 @@ type DDNSRule struct {
 	IPVersion      string       `json:"ip_version"`
 	// IPDetectMode: "api" (external, proxy-free) or "iface" (read local network interface)
 	IPDetectMode   string       `json:"ip_detect_mode"`
-	IPInterface    string       `json:"ip_interface"` // e.g. "eth0", only used when mode=iface
+	IPInterface    string       `json:"ip_interface"`  // e.g. "eth0", only used when mode=iface
+	// IPIndex: when mode=iface and version=ipv6, pick the Nth global IPv6 address (0-based, default 0)
+	IPIndex        int          `json:"ip_index"`
 	Interval       int          `json:"interval"`
 	Enabled        bool         `json:"enabled"`
 	ProviderConf   ProviderConf `json:"provider_conf"`
