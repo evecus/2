@@ -479,13 +479,19 @@ async function updateCert() {
   if (modalError.value) return
   saving.value = true
   try {
-    await api.put(`/tls/${editId.value}`, formPayload())
+    const id = editId.value
+    await api.put(`/tls/${id}`, formPayload())
     modal.value = null
-    // If ACME cert, re-issue after update
-    if (form.value.source === 'acme') {
-      await api.post(`/tls/${editId.value}/issue`)
-    }
     await load()
+    // Re-issue: always fire after save for ACME certs so the new CA/domains take effect.
+    // Do NOT await — issue is a long async operation on the server; we just fire and poll.
+    api.post(`/tls/${id}/issue`).catch(() => {})
+    const start = Date.now()
+    const poll = setInterval(async () => {
+      await load()
+      const c = certs.value.find(x => x.id === id)
+      if (!c || c.status !== 'pending' || Date.now() - start > 900000) clearInterval(poll)
+    }, 5000)
   } catch(e) {
     modalError.value = e.response?.data?.error || e.message
   } finally {
