@@ -412,8 +412,7 @@ function openEdit(cert) {
   const domains = cert.domains?.length ? cert.domains : (cert.domain ? [cert.domain] : [])
   form.value = {
     name:          cert.name || '',
-    domainsText:   domains.join('
-'),
+    domainsText:   domains.join('\n'),
     domain:        cert.domain,
     email:         cert.email || '',
     ca_provider:   cert.ca_provider || 'letsencrypt',
@@ -433,8 +432,7 @@ function openUpload() {
 }
 
 function validateForm() {
-  const domains = (form.value.domainsText || '').split('
-').map(s=>s.trim()).filter(Boolean)
+  const domains = (form.value.domainsText || '').split('\n').map(s=>s.trim()).filter(Boolean)
   if (!domains.length) return '请至少输入一个域名'
   if (!form.value.email)  return '请输入邮箱'
   if (form.value.ca_provider === 'zerossl') {
@@ -448,8 +446,7 @@ function validateForm() {
 }
 
 function formPayload() {
-  const domains = (form.value.domainsText || '').split('
-').map(s=>s.trim()).filter(Boolean)
+  const domains = (form.value.domainsText || '').split('\n').map(s=>s.trim()).filter(Boolean)
   return { ...form.value, domains, domain: domains[0] || '', domainsText: undefined }
 }
 
