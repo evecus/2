@@ -47,6 +47,8 @@
               <!-- CA badge -->
               <span v-if="cert.ca_provider === 'zerossl'" class="badge text-xs" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd">ZeroSSL</span>
               <span v-else-if="cert.source === 'acme'" class="badge text-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">Let's Encrypt</span>
+              <!-- fallback: ca_provider explicitly set but not matched above -->
+              <span v-else-if="cert.ca_provider && cert.ca_provider !== 'letsencrypt'" class="badge text-xs badge-slate">{{ cert.ca_provider }}</span>
               <ProviderBadge v-if="cert.provider" :provider="cert.provider" />
               <span v-if="cert.auto_renew" class="badge badge-green text-xs">自动续期</span>
             </div>
@@ -92,7 +94,7 @@
         <!-- Error message -->
         <div v-if="cert.status === 'error'" class="mt-3 px-3 py-2 bg-red-50 rounded-lg border border-red-100 text-xs text-red-600 flex items-center gap-2">
           <AlertCircle :size="13" />
-          申请失败，请检查 DNS 提供商配置后重新申请
+          {{ cert.error_msg || '申请失败，请检查 DNS 提供商配置后重新申请' }}
         </div>
       </div>
     </div>
