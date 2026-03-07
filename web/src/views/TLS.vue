@@ -2,15 +2,15 @@
   <div class="space-y-6 animate-fade-in">
     <div class="page-header">
       <div>
-        <h1 class="page-title">TLS 证书</h1>
-        <p class="page-subtitle">DNS-01 自动申请证书，支持 Let's Encrypt 和 ZeroSSL，手动上传，自动续期</p>
+        <h1 class="page-title">{{ t('tlsTitle') }}</h1>
+        <p class="page-subtitle">{{ t('tlsSubtitle') }}</p>
       </div>
       <div class="flex gap-2">
         <button class="btn-secondary" @click="openUpload()">
-          <Upload :size="16" /> 上传证书
+          <Upload :size="16" /> {{ t('uploadCert') }}
         </button>
         <button class="btn-primary" @click="openModal()">
-          <Plus :size="16" /> 申请证书
+          <Plus :size="16" /> {{ t('applyCert') }}
         </button>
       </div>
     </div>
@@ -19,8 +19,8 @@
       <div class="w-16 h-16 rounded-3xl bg-amber-50 flex items-center justify-center mx-auto mb-4">
         <Shield :size="28" class="text-amber-400" />
       </div>
-      <p class="text-slate-500 font-medium">暂无 TLS 证书</p>
-      <p class="text-slate-400 text-sm mt-1">点击右上角申请或上传证书</p>
+      <p class="text-slate-500 font-medium">{{ t('noTlsCerts') }}</p>
+      <p class="text-slate-400 text-sm mt-1">{{ t('noTlsCertsHint') }}</p>
     </div>
 
     <div v-else class="grid gap-4">
@@ -43,14 +43,14 @@
               <span v-for="d in (cert.domains||[cert.domain]).slice(0,3)" :key="d"
                     class="font-mono text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{{ d }}</span>
               <span v-if="(cert.domains||[]).length > 3" class="text-xs text-slate-400">+{{ cert.domains.length-3 }}</span>
-              <span class="badge badge-slate text-xs">{{ cert.source === 'acme' ? 'ACME' : '手动' }}</span>
+              <span class="badge badge-slate text-xs">{{ cert.source === 'acme' ? 'ACME' : t('manual') }}</span>
               <!-- CA badge -->
               <span v-if="cert.ca_provider === 'zerossl'" class="badge text-xs" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd">ZeroSSL</span>
               <span v-else-if="cert.source === 'acme'" class="badge text-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">Let's Encrypt</span>
               <!-- fallback: ca_provider explicitly set but not matched above -->
               <span v-else-if="cert.ca_provider && cert.ca_provider !== 'letsencrypt'" class="badge text-xs badge-slate">{{ cert.ca_provider }}</span>
               <ProviderBadge v-if="cert.provider" :provider="cert.provider" />
-              <span v-if="cert.auto_renew" class="badge badge-green text-xs">自动续期</span>
+              <span v-if="cert.auto_renew" class="badge badge-green text-xs">{{ t('autoRenew') }}</span>
             </div>
 
             <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-2 max-w-xs">
@@ -59,31 +59,31 @@
             </div>
 
             <div class="flex items-center gap-4 text-xs text-slate-400">
-              <span v-if="cert.issued_at">签发: {{ fmtDate(cert.issued_at) }}</span>
-              <span v-if="cert.expires_at">到期: {{ fmtDate(cert.expires_at) }}</span>
+              <span v-if="cert.issued_at">{{ t('issuedAt') }} {{ fmtDate(cert.issued_at) }}</span>
+              <span v-if="cert.expires_at">{{ t('expiresAt') }} {{ fmtDate(cert.expires_at) }}</span>
             </div>
           </div>
 
           <div class="flex items-center gap-1.5 flex-shrink-0">
             <!-- Download (only if cert exists) -->
             <button v-if="cert.status === 'active'" @click="downloadCert(cert)"
-                    class="btn-ghost btn-sm text-slate-500" title="下载证书">
+                    class="btn-ghost btn-sm text-slate-500" :title="t('downloadCert')">
               <Download :size="13" />
             </button>
             <!-- View PEM -->
             <button v-if="cert.status === 'active'" @click="viewPEM(cert)"
-                    class="btn-ghost btn-sm text-slate-500" title="查看证书内容">
+                    class="btn-ghost btn-sm text-slate-500" :title="t('viewCert')">
               <Eye :size="13" />
             </button>
             <!-- Edit -->
-            <button @click="openEdit(cert)" class="btn-ghost btn-sm text-slate-500" title="编辑">
+            <button @click="openEdit(cert)" class="btn-ghost btn-sm text-slate-500" :title="t('editCert')">
               <Pencil :size="13" />
             </button>
             <!-- Re-issue (ACME only) -->
             <button v-if="cert.source === 'acme'" @click="issue(cert.id)"
                     class="btn-secondary btn-sm" :disabled="cert.status === 'pending'">
               <RefreshCw :size="13" :class="cert.status === 'pending' ? 'animate-spin' : ''" />
-              {{ cert.status === 'pending' ? '申请中' : '重新申请' }}
+              {{ cert.status === 'pending' ? t('applying') : t('reApply') }}
             </button>
             <button @click="del(cert.id)" class="btn-ghost btn-sm text-red-400 hover:text-red-500 hover:bg-red-50">
               <Trash2 :size="13" />
@@ -94,7 +94,7 @@
         <!-- Error message -->
         <div v-if="cert.status === 'error'" class="mt-3 px-3 py-2 bg-red-50 rounded-lg border border-red-100 text-xs text-red-600 flex items-center gap-2">
           <AlertCircle :size="13" />
-          {{ cert.error_msg || '申请失败，请检查 DNS 提供商配置后重新申请' }}
+          {{ cert.error_msg || t('applyFailed') }}
         </div>
       </div>
     </div>
@@ -105,8 +105,8 @@
         <div class="modal-box max-w-lg">
           <div class="flex items-center justify-between p-6 border-b border-slate-100">
             <div>
-              <h3 class="font-semibold text-slate-900">{{ editId ? '编辑证书' : '申请 ACME 证书' }}</h3>
-              <p class="text-xs text-slate-400 mt-0.5">DNS-01 验证，支持泛域名，无需开放 80/443 端口</p>
+              <h3 class="font-semibold text-slate-900">{{ editId ? t('editTlsCert') : t('applyAcme') }}</h3>
+              <p class="text-xs text-slate-400 mt-0.5">{{ t('acmeDesc') }}</p>
             </div>
             <button @click="modal=null" class="btn-ghost btn-sm"><X :size="16" /></button>
           </div>
@@ -114,37 +114,37 @@
           <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
             <!-- CA Provider -->
             <div>
-              <label class="input-label">证书颁发机构 (CA)</label>
+              <label class="input-label">{{ t('caProvider') }}</label>
               <div class="grid grid-cols-2 gap-3">
                 <button type="button"
                   @click="form.ca_provider='letsencrypt'"
                   :class="['ca-btn', form.ca_provider !== 'zerossl' ? 'ca-btn-active' : '']">
                   <div class="font-semibold text-sm">Let's Encrypt</div>
-                  <div class="text-xs text-slate-400 mt-0.5">免费，每3个月续期，全球信任</div>
+                  <div class="text-xs text-slate-400 mt-0.5">{{ t('leFree') }}</div>
                 </button>
                 <button type="button"
                   @click="form.ca_provider='zerossl'"
                   :class="['ca-btn', form.ca_provider === 'zerossl' ? 'ca-btn-active' : '']">
                   <div class="font-semibold text-sm">ZeroSSL</div>
-                  <div class="text-xs text-slate-400 mt-0.5">免费，需要邮箱注册 EAB 凭据</div>
+                  <div class="text-xs text-slate-400 mt-0.5">{{ t('zsFree') }}</div>
                 </button>
               </div>
             </div>
 
             <div>
-              <label class="input-label">证书任务名称</label>
-              <input v-model="form.name" class="input" placeholder="例如：主站证书、泛域名证书" />
+              <label class="input-label">{{ t('certTaskName') }}</label>
+              <input v-model="form.name" class="input" :placeholder="t('certTaskPlaceholder')" />
             </div>
 
             <div>
-              <label class="input-label">域名列表（一行一个）</label>
+              <label class="input-label">{{ t('certDomains') }}</label>
               <textarea v-model="form.domainsText" class="input font-mono text-sm resize-none" rows="4"
                         placeholder="example.com&#10;*.example.com&#10;www.example.com"></textarea>
-              <p class="text-xs text-slate-400 mt-1">支持多个域名和泛域名，将申请为同一证书的 SAN 扩展</p>
+              <p class="text-xs text-slate-400 mt-1">{{ t('certDomainsHint') }}</p>
             </div>
 
             <div>
-              <label class="input-label">邮箱（ACME 账号）</label>
+              <label class="input-label">{{ t('acmeEmail') }}</label>
               <input v-model="form.email" class="input" type="email" placeholder="admin@example.com" />
             </div>
 
@@ -154,8 +154,8 @@
               <div class="flex items-start gap-2">
                 <Info :size="14" class="text-sky-500 mt-0.5 flex-shrink-0" />
                 <p class="text-xs text-sky-700">
-                  ZeroSSL 需要 EAB（外部账号绑定）凭据。
-                  前往 <a href="https://app.zerossl.com/developer" target="_blank" class="underline font-medium">ZeroSSL 开发者页面</a> 生成 EAB Key ID 和 HMAC Key。
+                  {{ t('zsEabHint') }}
+                  <a href="https://app.zerossl.com/developer" target="_blank" class="underline font-medium">{{ t('zsEabLink') }}</a>
                 </p>
               </div>
               <div>
@@ -170,7 +170,7 @@
 
             <!-- DNS Provider -->
             <div>
-              <label class="input-label">DNS 服务商</label>
+              <label class="input-label">{{ t('dnsProviderLabel') }}</label>
               <select v-model="form.provider" class="select">
                 <option value="cloudflare">Cloudflare</option>
               </select>
@@ -180,7 +180,7 @@
               <div class="p-4 bg-amber-50 rounded-xl border border-amber-100 space-y-3">
                 <h4 class="text-xs font-bold text-amber-700 uppercase tracking-wide">Cloudflare DNS API</h4>
                 <div class="p-3 bg-amber-100/60 rounded-lg text-xs text-amber-700">
-                  需要创建一个具有 <strong>DNS:Edit</strong> 权限的 API Token（不是 Global API Key）
+                  <span v-html="t('cfTokenHint')"></span>
                 </div>
                 <div>
                   <label class="input-label">API Token</label>
@@ -188,7 +188,7 @@
                 </div>
                 <div>
                   <label class="input-label">Zone ID</label>
-                  <input v-model="form.provider_conf.zone_id" class="input font-mono text-xs" placeholder="域名 Zone ID（可选，自动检测）" />
+                  <input v-model="form.provider_conf.zone_id" class="input font-mono text-xs" :placeholder="t('cfZoneIdPlaceholder')" />
                 </div>
               </div>
             </template>
@@ -199,7 +199,7 @@
                 <div class="toggle-track"></div>
                 <div class="toggle-thumb"></div>
               </label>
-              <span class="text-sm text-slate-600">到期前 30 天自动续期</span>
+              <span class="text-sm text-slate-600">{{ t('autoRenewHint') }}</span>
             </div>
 
             <div v-if="modalError" class="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2.5 rounded-xl border border-red-100 text-xs">
@@ -208,10 +208,10 @@
           </div>
 
           <div class="flex justify-end gap-3 px-6 pb-6">
-            <button class="btn-secondary" @click="modal=null">取消</button>
+            <button class="btn-secondary" @click="modal=null">{{ t('cancel') }}</button>
             <button class="btn-primary" @click="editId ? updateCert() : createAndIssue()" :disabled="saving">
               <Shield :size="14" />
-              {{ editId ? '保存并重新申请' : '创建并申请' }}
+              {{ editId ? t('saveReApply') : t('createApply') }}
             </button>
           </div>
         </div>
@@ -224,48 +224,48 @@
         <div class="modal-box">
           <div class="flex items-center justify-between p-6 border-b border-slate-100">
             <div>
-              <h3 class="font-semibold text-slate-900">上传证书</h3>
-              <p class="text-xs text-slate-400 mt-0.5">上传 PEM 文件或包含 cert.pem + key.pem 的压缩包</p>
+              <h3 class="font-semibold text-slate-900">{{ t('uploadCertTitle') }}</h3>
+              <p class="text-xs text-slate-400 mt-0.5">{{ t('uploadCertDesc') }}</p>
             </div>
             <button @click="uploadModal=null" class="btn-ghost btn-sm"><X :size="16" /></button>
           </div>
           <div class="p-6 space-y-4">
             <div>
-              <label class="input-label">域名</label>
-              <input v-model="uploadForm.domain" class="input font-mono" placeholder="example.com 或 *.example.com" />
+              <label class="input-label">{{ t('domain') }}</label>
+              <input v-model="uploadForm.domain" class="input font-mono" :placeholder="t('domainPlaceholder')" />
             </div>
 
             <!-- Upload mode tabs -->
             <div class="flex gap-2 p-1 bg-slate-100 rounded-xl">
               <button type="button" @click="uploadMode='files'"
                       :class="['flex-1 py-1.5 text-xs font-medium rounded-lg transition-all', uploadMode==='files' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700']">
-                📄 分开上传 (两个 .pem)
+                {{ t('separatePem') }}
               </button>
               <button type="button" @click="uploadMode='zip'"
                       :class="['flex-1 py-1.5 text-xs font-medium rounded-lg transition-all', uploadMode==='zip' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700']">
-                📦 压缩包 (.zip)
+                {{ t('zipUpload') }}
               </button>
               <button type="button" @click="uploadMode='paste'"
                       :class="['flex-1 py-1.5 text-xs font-medium rounded-lg transition-all', uploadMode==='paste' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700']">
-                📋 粘贴文本
+                {{ t('pasteText') }}
               </button>
             </div>
 
             <!-- Files mode -->
             <template v-if="uploadMode==='files'">
               <div>
-                <label class="input-label">证书文件 (cert.pem / fullchain.pem)</label>
+                <label class="input-label">{{ t('certFilePem') }}</label>
                 <label class="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-vane-300 hover:bg-vane-50/30 transition-all">
                   <Upload :size="16" class="text-slate-400 flex-shrink-0" />
-                  <span class="text-sm text-slate-500">{{ uploadForm.certFile ? uploadForm.certFile.name : '选择证书文件' }}</span>
+                  <span class="text-sm text-slate-500">{{ uploadForm.certFile ? uploadForm.certFile.name : t('selectFile') }}</span>
                   <input type="file" accept=".pem,.crt,.cer" class="hidden" @change="e => uploadForm.certFile = e.target.files[0]" />
                 </label>
               </div>
               <div>
-                <label class="input-label">私钥文件 (key.pem / privkey.pem)</label>
+                <label class="input-label">{{ t('keyFilePem') }}</label>
                 <label class="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-vane-300 hover:bg-vane-50/30 transition-all">
                   <Upload :size="16" class="text-slate-400 flex-shrink-0" />
-                  <span class="text-sm text-slate-500">{{ uploadForm.keyFile ? uploadForm.keyFile.name : '选择私钥文件' }}</span>
+                  <span class="text-sm text-slate-500">{{ uploadForm.keyFile ? uploadForm.keyFile.name : t('selectKeyFile') }}</span>
                   <input type="file" accept=".pem,.key" class="hidden" @change="e => uploadForm.keyFile = e.target.files[0]" />
                 </label>
               </div>
@@ -274,10 +274,10 @@
             <!-- Zip mode -->
             <template v-else-if="uploadMode==='zip'">
               <div>
-                <label class="input-label">压缩包（须包含 cert.pem 和 key.pem）</label>
+                <label class="input-label">{{ t('zipHint') }}</label>
                 <label class="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-vane-300 hover:bg-vane-50/30 transition-all">
                   <Upload :size="16" class="text-slate-400 flex-shrink-0" />
-                  <span class="text-sm text-slate-500">{{ uploadForm.zipFile ? uploadForm.zipFile.name : '选择 .zip 文件' }}</span>
+                  <span class="text-sm text-slate-500">{{ uploadForm.zipFile ? uploadForm.zipFile.name : t('selectZip') }}</span>
                   <input type="file" accept=".zip" class="hidden" @change="e => uploadForm.zipFile = e.target.files[0]" />
                 </label>
               </div>
@@ -286,12 +286,12 @@
             <!-- Paste mode -->
             <template v-else>
               <div>
-                <label class="input-label">证书内容 (PEM)</label>
+                <label class="input-label">{{ t('certPem') }}</label>
                 <textarea v-model="uploadForm.cert_pem" class="input font-mono text-xs h-24 resize-none"
                           placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
               </div>
               <div>
-                <label class="input-label">私钥内容 (PEM)</label>
+                <label class="input-label">{{ t('keyPem') }}</label>
                 <textarea v-model="uploadForm.key_pem" class="input font-mono text-xs h-24 resize-none"
                           placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"></textarea>
               </div>
@@ -302,8 +302,8 @@
             </div>
           </div>
           <div class="flex justify-end gap-3 px-6 pb-6">
-            <button class="btn-secondary" @click="uploadModal=null">取消</button>
-            <button class="btn-primary" @click="upload"><Upload :size="14" /> 上传</button>
+            <button class="btn-secondary" @click="uploadModal=null">{{ t('cancel') }}</button>
+            <button class="btn-primary" @click="upload"><Upload :size="14" /> {{ t('upload') }}</button>
           </div>
         </div>
       </div>
@@ -316,29 +316,29 @@
           <div class="flex items-center justify-between p-6 border-b border-slate-100">
             <div>
               <h3 class="font-semibold text-slate-900 font-mono">{{ pemData.domain }}</h3>
-              <p class="text-xs text-slate-400 mt-0.5">证书内容</p>
+              <p class="text-xs text-slate-400 mt-0.5">{{ t('certContent') }}</p>
             </div>
             <div class="flex gap-2">
-              <button class="btn-secondary btn-sm" @click="downloadFromPEM()"><Download :size="13" /> 下载证书</button>
-              <button class="btn-secondary btn-sm" @click="downloadKeyFromPEM()"><Download :size="13" /> 下载私钥</button>
+              <button class="btn-secondary btn-sm" @click="downloadFromPEM()"><Download :size="13" /> {{ t('downloadCertBtn') }}</button>
+              <button class="btn-secondary btn-sm" @click="downloadKeyFromPEM()"><Download :size="13" /> {{ t('downloadKey') }}</button>
               <button @click="pemModal=null" class="btn-ghost btn-sm"><X :size="16" /></button>
             </div>
           </div>
           <div class="p-6 space-y-4">
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="input-label mb-0">证书 (cert.pem)</label>
+                <label class="input-label mb-0">{{ t('certPemLabel') }}</label>
                 <button class="text-xs text-vane-500 hover:text-vane-700" @click="copy(pemData.cert_pem)">
-                  <Copy :size="12" class="inline mr-1" />复制
+                  <Copy :size="12" class="inline mr-1" />{{ t('copy') }}
                 </button>
               </div>
               <textarea readonly class="input font-mono text-xs h-40 resize-none bg-slate-50" :value="pemData.cert_pem"></textarea>
             </div>
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="input-label mb-0">私钥 (key.pem)</label>
+                <label class="input-label mb-0">{{ t('keyPemLabel') }}</label>
                 <button class="text-xs text-vane-500 hover:text-vane-700" @click="copy(pemData.key_pem)">
-                  <Copy :size="12" class="inline mr-1" />复制
+                  <Copy :size="12" class="inline mr-1" />{{ t('copy') }}
                 </button>
               </div>
               <textarea readonly class="input font-mono text-xs h-40 resize-none bg-slate-50" :value="pemData.key_pem"></textarea>
@@ -357,8 +357,11 @@ import {
   Download, Eye, Pencil, AlertCircle, Info, Copy
 } from 'lucide-vue-next'
 import { api } from '@/stores/auth'
+import { useI18n } from '@/stores/i18n'
 import ProviderBadge from '@/components/ProviderBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+
+const { t } = useI18n()
 
 const certs = ref([])
 const modal = ref(null)
@@ -435,14 +438,14 @@ function openUpload() {
 
 function validateForm() {
   const domains = (form.value.domainsText || '').split('\n').map(s=>s.trim()).filter(Boolean)
-  if (!domains.length) return '请至少输入一个域名'
-  if (!form.value.email)  return '请输入邮箱'
+  if (!domains.length) return t('errNoDomain')
+  if (!form.value.email)  return t('errNoEmail')
   if (form.value.ca_provider === 'zerossl') {
-    if (!form.value.provider_conf.zerossl_key_id) return '请输入 ZeroSSL EAB Key ID'
-    if (!form.value.provider_conf.zerossl_api_key) return '请输入 ZeroSSL EAB HMAC Key'
+    if (!form.value.provider_conf.zerossl_key_id) return t('errNoEabKeyId')
+    if (!form.value.provider_conf.zerossl_api_key) return t('errNoZsHmac')
   }
   if (form.value.provider === 'cloudflare' && !form.value.provider_conf.api_token) {
-    return '请输入 Cloudflare API Token'
+    return t('errNoCfToken')
   }
   return null
 }
@@ -519,29 +522,29 @@ async function issue(id) {
 
 async function upload() {
   uploadError.value = ''
-  if (!uploadForm.value.domain) { uploadError.value = '请输入域名'; return }
+  if (!uploadForm.value.domain) { uploadError.value = t('errNoDomainUpload'); return }
   try {
     if (uploadMode.value === 'files') {
       if (!uploadForm.value.certFile || !uploadForm.value.keyFile) {
-        uploadError.value = '请选择证书文件和私钥文件'; return
+        uploadError.value = t('errNoCertKey'); return
       }
       const cert_pem = await uploadForm.value.certFile.text()
       const key_pem  = await uploadForm.value.keyFile.text()
       await api.post('/tls/upload', { domain: uploadForm.value.domain, cert_pem, key_pem })
     } else if (uploadMode.value === 'zip') {
-      if (!uploadForm.value.zipFile) { uploadError.value = '请选择压缩包文件'; return }
+      if (!uploadForm.value.zipFile) { uploadError.value = t('errNoZip'); return }
       const JSZip = (await import('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js')).default
       const zip = await JSZip.loadAsync(uploadForm.value.zipFile)
       // Try common names
       const certEntry = zip.file('cert.pem') || zip.file('fullchain.pem') || zip.file('certificate.pem')
       const keyEntry  = zip.file('key.pem')  || zip.file('privkey.pem')   || zip.file('private.pem')
-      if (!certEntry || !keyEntry) { uploadError.value = '压缩包须包含 cert.pem 和 key.pem'; return }
+      if (!certEntry || !keyEntry) { uploadError.value = t('errZipContent'); return }
       const cert_pem = await certEntry.async('string')
       const key_pem  = await keyEntry.async('string')
       await api.post('/tls/upload', { domain: uploadForm.value.domain, cert_pem, key_pem })
     } else {
       if (!uploadForm.value.cert_pem || !uploadForm.value.key_pem) {
-        uploadError.value = '请输入证书和私钥内容'; return
+        uploadError.value = t('errNoPasteContent'); return
       }
       await api.post('/tls/upload', { domain: uploadForm.value.domain, cert_pem: uploadForm.value.cert_pem, key_pem: uploadForm.value.key_pem })
     }
@@ -553,7 +556,7 @@ async function upload() {
 }
 
 async function del(id) {
-  if (!confirm('确认删除此证书？')) return
+  if (!confirm(t('confirmDelCert'))) return
   await api.delete(`/tls/${id}`)
   await load()
 }
