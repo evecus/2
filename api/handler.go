@@ -67,6 +67,7 @@ func (h *Handler) Register(r *gin.Engine) {
 	// DDNS
 	auth.GET("/ddns", h.listDDNS)
 	auth.GET("/ddns/interfaces", h.listInterfaces)
+	auth.GET("/ddns/iface-ips", h.listIfaceIPs)
 	auth.POST("/ddns", h.createDDNS)
 	auth.PUT("/ddns/:id", h.updateDDNS)
 	auth.DELETE("/ddns/:id", h.deleteDDNS)
@@ -1100,4 +1101,22 @@ func (h *Handler) getCertPEM(c *gin.Context) {
 
 func (h *Handler) listInterfaces(c *gin.Context) {
 	c.JSON(200, ddns.GetInterfaces())
+}
+
+// GET /api/ddns/iface-ips?iface=eth0&version=ipv6
+// Returns list of suitable IPs on the given interface — used to preview
+// which IPv6 addresses are available so user can pick by index.
+func (h *Handler) listIfaceIPs(c *gin.Context) {
+	iface := c.Query("iface")
+	version := c.DefaultQuery("version", "ipv4")
+	if iface == "" {
+		c.JSON(400, gin.H{"error": "iface required"})
+		return
+	}
+	ips, err := ddns.ListInterfaceIPs(iface, version)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, ips)
 }
