@@ -1003,17 +1003,22 @@ func (h *Handler) issueCert(c *gin.Context) {
 	}
 	h.cfg.RUnlock()
 	go func() {
-		if err := h.tls.IssueCert(id); err != nil {
-			h.cfg.Lock()
-			for i := range h.cfg.TLSCerts {
-				if h.cfg.TLSCerts[i].ID == id {
+		err := h.tls.IssueCert(id)
+		h.cfg.Lock()
+		for i := range h.cfg.TLSCerts {
+			if h.cfg.TLSCerts[i].ID == id {
+				if err != nil {
+					log.Printf("[tls] issueCert %s failed: %v", id, err)
 					h.cfg.TLSCerts[i].Status = "error"
-					break
+					h.cfg.TLSCerts[i].ErrorMsg = err.Error()
+				} else {
+					h.cfg.TLSCerts[i].ErrorMsg = "" // clear on success
 				}
+				break
 			}
-			h.cfg.Unlock()
-			_ = h.cfg.Save()
 		}
+		h.cfg.Unlock()
+		_ = h.cfg.Save()
 	}()
 	h.cfg.Lock()
 	for i := range h.cfg.TLSCerts {
