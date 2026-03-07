@@ -82,6 +82,8 @@ func (m *Manager) IssueCert(certID string) error {
 	if cert == nil {
 		return fmt.Errorf("cert %s not found", certID)
 	}
+	log.Printf("[tls] IssueCert %s ca=%q domains=%v eab_key_id_len=%d",
+		certID, cert.CAProvider, cert.Domains, len(cert.ProviderConf.ZeroSSLKeyID))
 	if cert.Email == "" {
 		return fmt.Errorf("email is required for ACME certificate issuance")
 	}
@@ -116,6 +118,7 @@ func (m *Manager) IssueCert(certID string) error {
 	// Register account
 	var reg *registration.Resource
 	if cert.CAProvider == "zerossl" && cert.ProviderConf.ZeroSSLAPIKey != "" {
+		log.Printf("[tls] using ZeroSSL EAB registration for %s", certID)
 		// ZeroSSL supports EAB (External Account Binding)
 		reg, err = client.Registration.RegisterWithExternalAccountBinding(registration.RegisterEABOptions{
 			TermsOfServiceAgreed: true,
@@ -123,6 +126,7 @@ func (m *Manager) IssueCert(certID string) error {
 			HmacEncoded:          cert.ProviderConf.ZeroSSLAPIKey,
 		})
 	} else {
+		log.Printf("[tls] using standard ACME registration for %s (ca=%q)", certID, cert.CAProvider)
 		reg, err = client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
 	}
 	if err != nil {
