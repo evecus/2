@@ -1,6 +1,7 @@
 package ddns
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -171,25 +173,46 @@ func (w *Worker) check() {
 }
 
 
-// ─── Public IP Detection ─────────────────────────────────────────────────────
 // ─── Public IP Detection ──────────────────────────────────────────────────────
 
-// noProxyTransport returns a Transport with proxy disabled.
-func noProxyTransport() *http.Transport {
-	return &http.Transport{
-		Proxy: nil, // explicitly bypass system proxy
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 0,
-		}).DialContext,
-		DisableKeepAlives: true,
+// IP extraction regexes — same approach as ddns-go: scan the full response body
+// so any response format (plain text, JSON, HTML) works.
+var (
+	ipv4Reg = regexp.MustCompile(`((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])`)
+	ipv6Reg = regexp.MustCompile(`(([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|` +
+		`([0-9A-Fa-f]{1,4}:){1,7}:|` +
+		`([0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|` +
+		`([0-9A-Fa-f]{1,4}:){1,5}(:[0-9A-Fa-f]{1,4}){1,2}|` +
+		`([0-9A-Fa-f]{1,4}:){1,4}(:[0-9A-Fa-f]{1,4}){1,3}|` +
+		`([0-9A-Fa-f]{1,4}:){1,3}(:[0-9A-Fa-f]{1,4}){1,4}|` +
+		`([0-9A-Fa-f]{1,4}:){1,2}(:[0-9A-Fa-f]{1,4}){1,5}|` +
+		`[0-9A-Fa-f]{1,4}:(:[0-9A-Fa-f]{1,4}){1,6}|` +
+		`:(:[0-9A-Fa-f]{1,4}){1,7})`)
+)
+
+// noProxyClient follows ddns-go's strategy: force tcp4 or tcp6 at the dialer level.
+// This ensures we use the correct address family and bypass any system proxy.
+var noProxyDialer = &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 0}
+
+func noProxyClient(version string) *http.Client {
+	network := "tcp4"
+	if version == "ipv6" {
+		network = "tcp6"
+	}
+	return &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			DialContext: func(ctx context.Context, _, address string) (net.Conn, error) {
+				return noProxyDialer.DialContext(ctx, network, address)
+			},
+		},
 	}
 }
 
 // getPublicIP returns the machine's public IP.
-// mode: "api"   → query external service (proxy-free)
-//       "iface" → read IP from named network interface (iface param)
-// Falls back automatically: iface→api→error.
+// mode: "api"   → query external service (proxy-free, forced tcp4/tcp6)
+//       "iface" → read IP from named network interface
 func getPublicIP(version, mode, iface string, ipIndex int) (string, error) {
 	if mode == "iface" && iface != "" {
 		ip, err := getIPFromInterface(iface, version, ipIndex)
@@ -201,32 +224,28 @@ func getPublicIP(version, mode, iface string, ipIndex int) (string, error) {
 	return getPublicIPViaAPI(version)
 }
 
-// getPublicIPViaAPI queries external endpoints without using system proxy.
-// URL lists are tuned for reliability in Chinese networks.
+// getPublicIPViaAPI queries external endpoints with forced tcp4/tcp6 (no proxy).
+// Uses regex extraction — works with plain text, JSON, or HTML responses.
 func getPublicIPViaAPI(version string) (string, error) {
-	client := &http.Client{
-		Timeout:   10 * time.Second,
-		Transport: noProxyTransport(),
-	}
-	// IPv4 endpoints
-	ipv4URLs := []string{
-		"https://ddns.oray.com/checkip",
-		"http://v4.66666.host:66/ip",
-		"https://myip.ipip.net",
-		"http://v4.666666.host:66/ip",
+	client := noProxyClient(version)
+	reg := ipv4Reg
+	urls := []string{
+		"https://ipv4.icanhazip.com",
+		"https://api4.ipify.org",
+		"https://v4.ident.me",
+		"https://api4.ipify.org",
 		"https://4.ipw.cn",
-		"https://ip.3322.net",
 	}
-	// IPv6 endpoints
-	ipv6URLs := []string{
-		"http://v6.66666.host:66/ip",
-		"http://myip6.ipip.net",
-		"https://6.ipw.cn",
-		"http://v6.666666.host:66/ip",
-	}
-	urls := ipv4URLs
 	if version == "ipv6" {
-		urls = ipv6URLs
+		reg = ipv6Reg
+		urls = []string{
+			"https://ipv6.icanhazip.com",
+			"https://api6.ipify.org",
+			"https://v6.ident.me",
+			"https://api-ipv6.ip.sb/ip",
+			"https://api6.ipify.org",
+			"https://6.ipw.cn",
+		}
 	}
 	for _, u := range urls {
 		req, err := http.NewRequest(http.MethodGet, u, nil)
@@ -235,35 +254,19 @@ func getPublicIPViaAPI(version string) (string, error) {
 		}
 		resp, err := client.Do(req)
 		if err != nil {
+			log.Printf("[ddns] API %s failed: %v", u, err)
 			continue
 		}
-		b, err := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		resp.Body.Close()
-		if err != nil {
-			continue
-		}
-		// Some endpoints return JSON like {"ip":"1.2.3.4"}, extract IP robustly
-		ip := extractIP(strings.TrimSpace(string(b)))
+		ip := reg.FindString(string(body))
 		if ip != "" {
+			log.Printf("[ddns] got %s from %s: %s", version, u, ip)
 			return ip, nil
 		}
+		log.Printf("[ddns] %s returned no valid IP, body: %.80s", u, string(body))
 	}
-	return "", fmt.Errorf("all IP detection endpoints failed")
-}
-
-// extractIP picks the first IP-like token from a response body.
-// Handles plain "1.2.3.4", "Current IP Address: 1.2.3.4", or JSON substrings.
-func extractIP(body string) string {
-	// Try splitting on common separators and find first token that looks like an IP
-	for _, token := range strings.FieldsFunc(body, func(r rune) bool {
-		return r == ' ' || r == ':' || r == '\t' || r == '\n' || r == '\r' || r == '"' || r == '{'|| r == '}'
-	}) {
-		token = strings.TrimSpace(token)
-		if net.ParseIP(token) != nil {
-			return token
-		}
-	}
-	return ""
+	return "", fmt.Errorf("all %s IP detection endpoints failed", version)
 }
 
 // getIPFromInterface reads a suitable IP from a named network interface.
