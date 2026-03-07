@@ -113,7 +113,7 @@
               </div>
               <div>
                 <label class="input-label">IP 版本</label>
-                <select v-model="form.ip_version" class="select">
+                <select v-model="form.ip_version" class="select" @change="onIfaceChange">
                   <option value="ipv4">IPv4</option>
                   <option value="ipv6">IPv6</option>
                 </select>
@@ -144,33 +144,42 @@
                 </div>
               </div>
 
-              <!-- IPv6地址选择（仅IPv6） -->
+              <!-- IPv6地址选择（仅IPv6，自动加载） -->
               <div v-if="form.ip_version === 'ipv6'">
                 <label class="input-label">
-                  IP 选择匹配规则
-                  <span class="text-xs font-normal text-slate-400 ml-1">留空表示选当前网卡第一个 IP</span>
+                  选择使用的 IPv6 地址
+                  <span v-if="ifaceLoading" class="ml-2 text-xs text-amber-500 inline-flex items-center gap-1">
+                    <span class="inline-block w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+                    读取中...
+                  </span>
                 </label>
-                <div class="flex gap-2 items-start">
-                  <div class="flex-1">
-                    <select v-if="ifaceIPs.length" v-model.number="form.ip_index" class="select">
-                      <option :value="0">第 1 个地址{{ ifaceIPs[0] ? '：' + ifaceIPs[0] : '' }}</option>
-                      <option v-for="(ip, i) in ifaceIPs.slice(1)" :key="i+1" :value="i+1">
-                        第 {{ i+2 }} 个地址：{{ ip }}
-                      </option>
-                    </select>
-                    <input v-else v-model.number="form.ip_index" type="number" min="0" class="input"
-                           placeholder="0（第1个）" />
-                  </div>
-                  <button type="button" class="btn-secondary btn-sm whitespace-nowrap" @click="testIfaceIPs">
-                    IP 选择匹配测试
-                  </button>
+
+                <!-- 有地址：显示列表供选择 -->
+                <div v-if="ifaceIPs.length" class="space-y-1.5">
+                  <label v-for="(ip, i) in ifaceIPs" :key="i"
+                         class="flex items-center gap-3 p-2.5 rounded-xl border-2 cursor-pointer transition-all"
+                         :class="(form.ip_index ?? 0) === i
+                           ? 'border-vane-500 bg-vane-50'
+                           : 'border-slate-200 hover:border-vane-300'">
+                    <input type="radio" :value="i" v-model.number="form.ip_index" class="accent-vane-500" />
+                    <span class="font-mono text-sm text-slate-700 flex-1 break-all">{{ ip }}</span>
+                    <span class="text-xs text-slate-400 flex-shrink-0">第 {{ i + 1 }} 个</span>
+                  </label>
                 </div>
-                <!-- 测试结果 -->
-                <div v-if="ifaceTestResult" class="mt-2 p-2 rounded-lg text-xs font-mono"
-                     :class="ifaceTestResult.startsWith('错误') ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'">
-                  {{ ifaceTestResult }}
+
+                <!-- 读取失败 -->
+                <div v-else-if="!ifaceLoading && ifaceLoadError"
+                     class="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-mono">
+                  ⚠ {{ ifaceLoadError }}
                 </div>
-                <p class="text-xs text-slate-400 mt-1">网卡上有多个全局 IPv6 地址时，选用第几个（从 0 开始）</p>
+
+                <!-- 空：无全局 IPv6 地址 -->
+                <div v-else-if="!ifaceLoading && form.ip_interface"
+                     class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
+                  该网卡上未找到全局 IPv6 地址
+                </div>
+
+                <p class="text-xs text-slate-400 mt-1.5">仅显示全局单播 IPv6 地址（跳过链路本地和 ULA）</p>
               </div>
             </template>
 
@@ -256,6 +265,8 @@ const form = ref({})
 const interfaces = ref([])
 const ifaceIPs = ref([])
 const ifaceTestResult = ref('')
+const ifaceLoading = ref(false)
+const ifaceLoadError = ref('')
 // per-rule IP fetch status: { [id]: 'fetching' | 'ok' | 'fail' }
 const ipStatus = ref({})
 
@@ -294,42 +305,33 @@ async function loadInterfaces() {
 }
 
 async function loadIfaceIPs(iface, version) {
-  if (!iface) return
+  if (!iface || version !== 'ipv6') return
+  ifaceLoading.value = true
+  ifaceLoadError.value = ''
   try {
     const { data } = await api.get('/ddns/iface-ips', { params: { iface, version } })
     ifaceIPs.value = data || []
-  } catch {
+    // Auto-select first address if current index out of range
+    if (ifaceIPs.value.length && (form.value.ip_index ?? 0) >= ifaceIPs.value.length) {
+      form.value.ip_index = 0
+    }
+  } catch (e) {
     ifaceIPs.value = []
+    ifaceLoadError.value = e.response?.data?.error || e.message || '读取失败'
+  } finally {
+    ifaceLoading.value = false
   }
 }
 
 function onIfaceChange() {
   ifaceIPs.value = []
-  ifaceTestResult.value = ''
-  if (form.value.ip_detect_mode === 'iface' && form.value.ip_version === 'ipv6') {
+  ifaceLoadError.value = ''
+  if (form.value.ip_detect_mode === 'iface' && form.value.ip_version === 'ipv6' && form.value.ip_interface) {
     loadIfaceIPs(form.value.ip_interface, 'ipv6')
   }
 }
 
-async function testIfaceIPs() {
-  ifaceTestResult.value = '检测中...'
-  try {
-    const { data } = await api.get('/ddns/iface-ips', {
-      params: { iface: form.value.ip_interface, version: form.value.ip_version }
-    })
-    const ips = data || []
-    ifaceIPs.value = ips
-    if (!ips.length) {
-      ifaceTestResult.value = '错误：该网卡上未找到可用的全局 IPv6 地址'
-    } else {
-      const idx = form.value.ip_index || 0
-      const chosen = ips[idx] ?? ips[0]
-      ifaceTestResult.value = `找到 ${ips.length} 个地址，将使用第 ${(idx||0)+1} 个：${chosen}`
-    }
-  } catch (e) {
-    ifaceTestResult.value = '错误：' + (e.response?.data?.error || e.message)
-  }
-}
+
 
 function openModal(rule = null) {
   editing.value = !!rule
