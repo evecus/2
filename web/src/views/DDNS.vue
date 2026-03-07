@@ -33,12 +33,11 @@
               <ProviderBadge :provider="rule.provider" />
               <span class="badge badge-slate">{{ rule.ip_version === 'ipv6' ? 'IPv6' : 'IPv4' }}</span>
               <span v-if="rule.ip_detect_mode === 'iface'" class="badge text-xs" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd">
-                网卡: {{ rule.ip_interface }}
+                网卡: {{ rule.ip_interface }}{{ rule.ip_version === 'ipv6' && rule.ip_index ? ` [${rule.ip_index}]` : '' }}
               </span>
               <span v-else class="badge text-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">外部 API</span>
             </div>
 
-            <!-- Domain list -->
             <div class="flex flex-wrap gap-1.5 mb-3">
               <span v-for="d in effectiveDomains(rule)" :key="d"
                     class="font-mono text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">{{ d }}</span>
@@ -84,11 +83,13 @@
           </div>
           <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
 
+            <!-- 规则名称 -->
             <div>
               <label class="input-label">规则名称</label>
               <input v-model="form.name" class="input" placeholder="My DDNS" />
             </div>
 
+            <!-- DNS服务商 + IP版本 -->
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="input-label">DNS 服务商</label>
@@ -108,39 +109,61 @@
               </div>
             </div>
 
-            <!-- IP detection mode -->
+            <!-- IP 获取方式 -->
             <div>
-              <label class="input-label">IP 获取方式</label>
-              <div class="grid grid-cols-2 gap-3">
-                <button type="button" @click="form.ip_detect_mode='api'"
-                        :class="['p-3 rounded-xl border-2 text-left transition-all', form.ip_detect_mode!=='iface' ? 'border-vane-500 bg-vane-50' : 'border-slate-200 hover:border-vane-300']">
-                  <div class="font-semibold text-sm">🌐 外部 API</div>
-                  <div class="text-xs text-slate-400 mt-0.5">绕过代理，查询公网 IP</div>
-                </button>
-                <button type="button" @click="form.ip_detect_mode='iface'"
-                        :class="['p-3 rounded-xl border-2 text-left transition-all', form.ip_detect_mode==='iface' ? 'border-vane-500 bg-vane-50' : 'border-slate-200 hover:border-vane-300']">
-                  <div class="font-semibold text-sm">🔌 读取网卡</div>
-                  <div class="text-xs text-slate-400 mt-0.5">直接读本机网卡 IP</div>
-                </button>
-              </div>
+              <label class="input-label">获取公网 IP 方式</label>
+              <select v-model="form.ip_detect_mode" class="select">
+                <option value="api">通过外部 API 获取（自动绕过代理）</option>
+                <option value="iface">通过网卡获取</option>
+              </select>
             </div>
 
-            <!-- Interface selector (iface mode) -->
-            <div v-if="form.ip_detect_mode === 'iface'">
-              <label class="input-label">网卡名称</label>
-              <div class="flex gap-2">
-                <select v-if="interfaces.length" v-model="form.ip_interface" class="select flex-1">
-                  <option v-for="i in interfaces" :key="i" :value="i">{{ i }}</option>
-                </select>
-                <input v-else v-model="form.ip_interface" class="input flex-1 font-mono" placeholder="例如 eth0、ens3、ppp0" />
-                <button type="button" class="btn-secondary btn-sm whitespace-nowrap" @click="loadInterfaces">
-                  <RefreshCw :size="13" /> 刷新
-                </button>
+            <!-- 网卡选择（iface 模式） -->
+            <template v-if="form.ip_detect_mode === 'iface'">
+              <div>
+                <label class="input-label">网卡列表</label>
+                <div class="flex gap-2">
+                  <select v-if="interfaces.length" v-model="form.ip_interface" class="select flex-1" @change="onIfaceChange">
+                    <option v-for="i in interfaces" :key="i" :value="i">{{ i }}</option>
+                  </select>
+                  <input v-else v-model="form.ip_interface" class="input flex-1 font-mono" placeholder="eth0" @blur="onIfaceChange" />
+                  <button type="button" class="btn-secondary btn-sm whitespace-nowrap" @click="loadInterfaces">
+                    <RefreshCw :size="13" />
+                  </button>
+                </div>
               </div>
-              <p class="text-xs text-slate-400 mt-1">适合本机有公网 IP 的网卡（PPPoE 拨号、静态公网等）</p>
-            </div>
 
-            <!-- Domains textarea -->
+              <!-- IPv6地址选择（仅IPv6） -->
+              <div v-if="form.ip_version === 'ipv6'">
+                <label class="input-label">
+                  IP 选择匹配规则
+                  <span class="text-xs font-normal text-slate-400 ml-1">留空表示选当前网卡第一个 IP</span>
+                </label>
+                <div class="flex gap-2 items-start">
+                  <div class="flex-1">
+                    <select v-if="ifaceIPs.length" v-model.number="form.ip_index" class="select">
+                      <option :value="0">第 1 个地址{{ ifaceIPs[0] ? '：' + ifaceIPs[0] : '' }}</option>
+                      <option v-for="(ip, i) in ifaceIPs.slice(1)" :key="i+1" :value="i+1">
+                        第 {{ i+2 }} 个地址：{{ ip }}
+                      </option>
+                    </select>
+                    <input v-else v-model.number="form.ip_index" type="number" min="0" class="input"
+                           placeholder="0（第1个）" />
+                  </div>
+                  <button type="button" class="btn-secondary btn-sm whitespace-nowrap" @click="testIfaceIPs">
+                    IP 选择匹配测试
+                  </button>
+                </div>
+                <!-- 测试结果 -->
+                <div v-if="ifaceTestResult" class="mt-2 p-2 rounded-lg text-xs font-mono"
+                     :class="ifaceTestResult.startsWith('错误') ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'">
+                  {{ ifaceTestResult }}
+                </div>
+                <p class="text-xs text-slate-400 mt-1">网卡上有多个全局 IPv6 地址时，选用第几个（从 0 开始）</p>
+              </div>
+            </template>
+
+            <!-- 域名列表 -->
             <div>
               <label class="input-label">域名列表（一行一个）</label>
               <textarea v-model="form.domainsText" class="input font-mono text-sm resize-none" rows="4"
@@ -148,25 +171,31 @@
               <p class="text-xs text-slate-400 mt-1">每行一个完整域名，支持泛域名（*.example.com）</p>
             </div>
 
+            <!-- 检测间隔 -->
             <div>
               <label class="input-label">检测间隔（秒）</label>
               <input v-model.number="form.interval" type="number" min="60" class="input max-w-xs" placeholder="300" />
             </div>
 
-            <!-- Provider config -->
+            <!-- Cloudflare -->
             <template v-if="form.provider === 'cloudflare'">
               <div class="p-4 bg-amber-50 rounded-xl border border-amber-100 space-y-3">
                 <h4 class="text-xs font-bold text-amber-700 uppercase tracking-wide">Cloudflare 配置</h4>
                 <div>
-                  <label class="input-label">API Token</label>
+                  <label class="input-label">API Token <span class="text-red-400">*</span></label>
                   <input v-model="form.provider_conf.api_token" class="input font-mono text-xs" placeholder="DNS:Edit 权限的 API Token" />
                 </div>
                 <div>
-                  <label class="input-label">Zone ID</label>
-                  <input v-model="form.provider_conf.zone_id" class="input font-mono text-xs" />
+                  <label class="input-label">
+                    Zone ID
+                    <span class="text-xs font-normal text-slate-400 ml-1">（可选，留空自动从域名推导）</span>
+                  </label>
+                  <input v-model="form.provider_conf.zone_id" class="input font-mono text-xs" placeholder="留空则自动查找" />
                 </div>
               </div>
             </template>
+
+            <!-- 阿里云 -->
             <template v-if="form.provider === 'alidns'">
               <div class="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
                 <h4 class="text-xs font-bold text-blue-700 uppercase tracking-wide">阿里云 DNS 配置</h4>
@@ -174,6 +203,8 @@
                 <div><label class="input-label">Access Key Secret</label><input v-model="form.provider_conf.access_key_secret" class="input font-mono text-xs" type="password" /></div>
               </div>
             </template>
+
+            <!-- DNSPod/腾讯云 -->
             <template v-if="form.provider === 'dnspod' || form.provider === 'tencentcloud'">
               <div class="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
                 <h4 class="text-xs font-bold text-blue-700 uppercase tracking-wide">{{ form.provider === 'dnspod' ? 'DNSPod' : '腾讯云' }} 配置</h4>
@@ -189,6 +220,7 @@
               </label>
               <span class="text-sm text-slate-600">创建后立即启用</span>
             </div>
+
           </div>
           <div class="flex justify-end gap-3 px-6 pb-6">
             <button class="btn-secondary" @click="modal=null">取消</button>
@@ -211,6 +243,8 @@ const modal = ref(null)
 const editing = ref(false)
 const form = ref({})
 const interfaces = ref([])
+const ifaceIPs = ref([])
+const ifaceTestResult = ref('')
 
 function effectiveDomains(rule) {
   if (rule.domains?.length) return rule.domains
@@ -225,7 +259,8 @@ function effectiveDomains(rule) {
 function defaultForm() {
   return {
     name: '', provider: 'cloudflare', domainsText: '',
-    ip_version: 'ipv4', ip_detect_mode: 'api', ip_interface: '',
+    ip_version: 'ipv4', ip_detect_mode: 'api',
+    ip_interface: '', ip_index: 0,
     interval: 300, enabled: true, provider_conf: {}
   }
 }
@@ -245,8 +280,48 @@ async function loadInterfaces() {
   } catch {}
 }
 
+async function loadIfaceIPs(iface, version) {
+  if (!iface) return
+  try {
+    const { data } = await api.get('/ddns/iface-ips', { params: { iface, version } })
+    ifaceIPs.value = data || []
+  } catch {
+    ifaceIPs.value = []
+  }
+}
+
+function onIfaceChange() {
+  ifaceIPs.value = []
+  ifaceTestResult.value = ''
+  if (form.value.ip_detect_mode === 'iface' && form.value.ip_version === 'ipv6') {
+    loadIfaceIPs(form.value.ip_interface, 'ipv6')
+  }
+}
+
+async function testIfaceIPs() {
+  ifaceTestResult.value = '检测中...'
+  try {
+    const { data } = await api.get('/ddns/iface-ips', {
+      params: { iface: form.value.ip_interface, version: form.value.ip_version }
+    })
+    const ips = data || []
+    ifaceIPs.value = ips
+    if (!ips.length) {
+      ifaceTestResult.value = '错误：该网卡上未找到可用的全局 IPv6 地址'
+    } else {
+      const idx = form.value.ip_index || 0
+      const chosen = ips[idx] ?? ips[0]
+      ifaceTestResult.value = `找到 ${ips.length} 个地址，将使用第 ${(idx||0)+1} 个：${chosen}`
+    }
+  } catch (e) {
+    ifaceTestResult.value = '错误：' + (e.response?.data?.error || e.message)
+  }
+}
+
 function openModal(rule = null) {
   editing.value = !!rule
+  ifaceIPs.value = []
+  ifaceTestResult.value = ''
   if (rule) {
     const domains = rule.domains?.length ? rule.domains : effectiveDomains(rule)
     form.value = {
@@ -255,6 +330,10 @@ function openModal(rule = null) {
       domainsText: domains.join('\n'),
       ip_detect_mode: rule.ip_detect_mode || 'api',
       ip_interface: rule.ip_interface || '',
+      ip_index: rule.ip_index ?? 0,
+    }
+    if (rule.ip_detect_mode === 'iface' && rule.ip_version === 'ipv6') {
+      loadIfaceIPs(rule.ip_interface, 'ipv6')
     }
   } else {
     form.value = defaultForm()
