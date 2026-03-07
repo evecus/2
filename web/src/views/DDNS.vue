@@ -52,7 +52,18 @@
             </div>
 
             <div class="flex items-center gap-4 text-xs text-slate-400">
-              <span>当前 IP: <span class="font-mono text-slate-600">{{ rule.last_ip || '未知' }}</span></span>
+              <!-- IP status with real-time feedback -->
+              <span v-if="ipStatus[rule.id] === 'fetching'" class="flex items-center gap-1 text-amber-500 font-medium">
+                <span class="inline-block w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+                获取 IP 中...
+              </span>
+              <span v-else-if="ipStatus[rule.id] === 'fail'" class="text-red-400 font-medium">⚠ IP 获取失败</span>
+              <span v-else>
+                当前 IP:
+                <span class="font-mono" :class="rule.last_ip ? 'text-slate-700' : 'text-slate-400'">
+                  {{ rule.last_ip || '未知' }}
+                </span>
+              </span>
               <span v-if="rule.last_updated">更新: {{ new Date(rule.last_updated).toLocaleString('zh-CN') }}</span>
               <span>间隔: {{ rule.interval || 300 }}s</span>
             </div>
@@ -245,6 +256,8 @@ const form = ref({})
 const interfaces = ref([])
 const ifaceIPs = ref([])
 const ifaceTestResult = ref('')
+// per-rule IP fetch status: { [id]: 'fetching' | 'ok' | 'fail' }
+const ipStatus = ref({})
 
 function effectiveDomains(rule) {
   if (rule.domains?.length) return rule.domains
@@ -346,17 +359,48 @@ async function save() {
   const domains = form.value.domainsText
     .split('\n').map(s => s.trim()).filter(Boolean)
   const payload = { ...form.value, domains, domainsText: undefined }
+  let savedId = form.value.id
   if (editing.value) {
-    await api.put(`/ddns/${form.value.id}`, payload)
+    await api.put(`/ddns/${savedId}`, payload)
   } else {
-    await api.post('/ddns', payload)
+    const { data } = await api.post('/ddns', payload)
+    savedId = data.id
   }
   modal.value = null
   await load()
+  // Trigger immediate IP detection and show status
+  triggerRefreshWithStatus(savedId)
+}
+
+// Trigger a refresh and track its status in ipStatus
+async function triggerRefreshWithStatus(id) {
+  ipStatus.value[id] = 'fetching'
+  try {
+    await api.post(`/ddns/${id}/refresh`)
+    // Poll until last_ip appears or timeout (30s)
+    const deadline = Date.now() + 30000
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 1200))
+      await load()
+      const rule = rules.value.find(r => r.id === id)
+      if (rule?.last_ip) {
+        ipStatus.value[id] = 'ok'
+        // Clear 'ok' status after 5s so it looks normal
+        setTimeout(() => { delete ipStatus.value[id] }, 5000)
+        return
+      }
+    }
+    // Timeout — still no IP
+    ipStatus.value[id] = 'fail'
+    setTimeout(() => { delete ipStatus.value[id] }, 8000)
+  } catch {
+    ipStatus.value[id] = 'fail'
+    setTimeout(() => { delete ipStatus.value[id] }, 8000)
+  }
 }
 
 async function toggle(id) { await api.post(`/ddns/${id}/toggle`); await load() }
-async function refresh(id) { await api.post(`/ddns/${id}/refresh`); setTimeout(load, 800) }
+async function refresh(id) { triggerRefreshWithStatus(id) }
 async function del(id) {
   if (!confirm('确认删除此 DDNS 规则？')) return
   await api.delete(`/ddns/${id}`); await load()
