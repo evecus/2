@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"io"
 	"net/http"
 	"strconv"
@@ -950,6 +951,7 @@ func (h *Handler) updateCert(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("[tls] updateCert %s ca_provider=%q domains=%v", id, req.CAProvider, req.Domains)
 	h.cfg.Lock()
 	for i := range h.cfg.TLSCerts {
 		if h.cfg.TLSCerts[i].ID == id {
@@ -990,6 +992,16 @@ func (h *Handler) deleteCert(c *gin.Context) {
 
 func (h *Handler) issueCert(c *gin.Context) {
 	id := c.Param("id")
+	// Log the CA provider we're about to use, for debugging
+	h.cfg.RLock()
+	for _, cert := range h.cfg.TLSCerts {
+		if cert.ID == id {
+			log.Printf("[tls] issueCert %s ca_provider=%q domains=%v zerossl_key_id_len=%d",
+				id, cert.CAProvider, cert.Domains, len(cert.ProviderConf.ZeroSSLKeyID))
+			break
+		}
+	}
+	h.cfg.RUnlock()
 	go func() {
 		if err := h.tls.IssueCert(id); err != nil {
 			h.cfg.Lock()
