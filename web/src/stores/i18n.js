@@ -6,8 +6,8 @@ const messages = {
     // Layout
     main: '主导航', system: '系统',
     dashboard: '仪表盘', portforward: '端口转发',
-    ddns: '动态域名 DDNS', webservice: 'Web 服务',
-    tls: 'TLS 证书', settings: '设置',
+    ddns: '动态域名', webservice: 'Web 服务',
+    tls: 'SSL 证书', settings: '设置',
     administrator: '管理员', running: '运行中',
     // Login
     welcomeBack: '欢迎回来', username: '用户名',
@@ -63,8 +63,8 @@ const messages = {
   en: {
     main: 'MAIN', system: 'SYSTEM',
     dashboard: 'Dashboard', portforward: 'Port Forward',
-    ddns: 'Dynamic DNS', webservice: 'Web Service',
-    tls: 'TLS Certs', settings: 'Settings',
+    ddns: 'Dynamic Domain', webservice: 'Web Service',
+    tls: 'SSL Certs', settings: 'Settings',
     administrator: 'Administrator', running: 'Running',
     welcomeBack: 'Welcome back', username: 'Username',
     password: 'Password', signIn: 'Sign In', signingIn: 'Signing in...',
